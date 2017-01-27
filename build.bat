@@ -13,6 +13,5 @@ set CompilerFlags=-MTd -nologo -GR- -Od -W4 -Z7 -FC -wd4201 -EHa -I %IncludesDir
 
 set LinkerFlags=-INCREMENTAL:NO -opt:ref user32.lib gdi32.lib shell32.lib opengl32.lib -LIBPATH:%GLFWLibDirectory% glfw3.lib -LIBPATH:%GLEWLibDirectory% libglew32d.lib
 
-cl %CompilerFlags% ..\main.cpp -LD /link %LinkerFlags%
-
+cl %CompilerFlags% ..\main.cpp /link %LinkerFlags%
 popd
