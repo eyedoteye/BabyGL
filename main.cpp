@@ -31,6 +31,9 @@ struct Camera
   glm::vec3 position;
   glm::vec3 front;
   glm::vec3 up;
+
+  GLfloat yaw;
+  GLfloat pitch;
 };
 
 void initCamera(Camera* camera)
@@ -38,6 +41,9 @@ void initCamera(Camera* camera)
   camera->position = glm::vec3(0.f, 0.f, -5.f);
   camera->front = glm::vec3(0.f, 0.f, 1.f);
   camera->up = glm::vec3(0.f, 1.f, 0.f);
+
+  camera->yaw = 90.f;
+  camera->pitch = 0.f;
 }
 
 static bool keys[1024];
@@ -58,7 +64,14 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
   }
 }
 
-void updateCamera(Camera* camera, float dT)
+static GLfloat mouseCoords[2];
+void mouseCallback(GLFWwindow* window, double xpos, double ypos)
+{
+  mouseCoords[0] = (GLfloat)xpos;
+  mouseCoords[1] = (GLfloat)ypos;
+}
+
+void updateCamera(Camera* camera, GLfloat xOffset, GLfloat yOffset, float dT)
 {
   if(keys[GLFW_KEY_W])
     camera->position += camera->front * dT;
@@ -68,6 +81,18 @@ void updateCamera(Camera* camera, float dT)
     camera->position -= glm::normalize(glm::cross(camera->front, camera->up)) * dT;
   if(keys[GLFW_KEY_D])
     camera->position += glm::normalize(glm::cross(camera->front, camera->up)) * dT;
+
+  camera->pitch -= yOffset * 0.05f;
+  camera->yaw += xOffset * 0.05f;
+
+  camera->pitch = camera->pitch > 89.f ? 89.f : camera->pitch;
+  camera->pitch = camera->pitch < -89.f ? -89.f : camera->pitch;
+
+  glm::vec3 front;
+  front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+  front.y = sin(glm::radians(camera->pitch));
+  front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+  camera->front = glm::normalize(front);
 }
 
 int main()
@@ -76,6 +101,7 @@ int main()
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	GLFWwindow* window = glfwCreateWindow(640,480, "Duckbut", NULL, NULL);
   if(!window)
@@ -96,6 +122,8 @@ int main()
   }
 
   glfwSetKeyCallback(window, keyCallback);
+  glfwSetCursorPosCallback(window, mouseCallback);
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
@@ -177,20 +205,40 @@ int main()
   Camera camera;
   initCamera(&camera);
 
+  GLfloat mouseCoordsAtLastFrameStart[2];
+  mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
+  mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
+
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
+  bool firstFrame = true;
   while(!glfwWindowShouldClose(window))
   {
+    printf("MouseX:%f\tMouseY:%f\t"
+           "Camera.Yaw:%f\tCamera.Pitch:%f\n",
+           mouseCoords[0], mouseCoords[1],
+           camera.yaw, camera.pitch);
     GLfloat timeNow = (GLfloat)glfwGetTime();
     dT = timeNow - timeAtLastFrameStart;
     timeAtLastFrameStart = timeNow;
 
     glfwPollEvents();
 
+    GLfloat mouseCoordsNow[2];
+    mouseCoordsNow[0] = mouseCoords[0];
+    mouseCoordsNow[1] = mouseCoords[1];
+
+    updateCamera(&camera,
+                 mouseCoordsNow[0] - mouseCoordsAtLastFrameStart[0],
+                 mouseCoordsNow[1] - mouseCoordsAtLastFrameStart[1],
+                 dT);
+
+    mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
+    mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
+
 #define ROTATION_SPEED 1.f
     model = glm::rotate(model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
     //cameraPosition += cameraFront * dT;
-    updateCamera(&camera, dT);
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
     glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
@@ -210,6 +258,7 @@ int main()
     glBindVertexArray(0);
 
     glfwSwapBuffers(window);
+    firstFrame = false;
   }
 
   glfwTerminate();
