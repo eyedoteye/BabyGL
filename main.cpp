@@ -4,6 +4,27 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+struct plane
+{
+  GLfloat vertices[12];
+  GLuint indices[12];
+};
+
+static plane squarePlane = {
+  {
+    -0.5f, -0.5f, 0.0f,
+    -0.5f,  0.5f, 0.0f,
+    0.5f, -0.5f, 0.0f,
+    0.5f,  0.5f, 0.0f
+  },
+  {
+    0, 1, 2,
+    2, 1, 3
+  }
+};
 
 int main()
 {
@@ -38,9 +59,12 @@ int main()
   GLchar* vertexShaderSource =
     "#version 400 core\n"
     "layout (location = 0) in vec3 position;"
+    "uniform mat4 model;"
+    "uniform mat4 view;"
+    "uniform mat4 projection;"
     "void main()"
     "{"
-    " gl_Position = vec4(position.x, position.y, position.z, 1.0);"
+    " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.0);"
     "}";
 
   GLchar* fragmentShaderSource =
@@ -48,7 +72,7 @@ int main()
     "out vec4 color;"
     "void main()"
     "{"
-    " color = vec4(1.0f, 0.5f, 0.2f, 1.0f);"
+    " color = vec4(0.7f, 0.7f, 0.7f, 1.0f);"
     "}";
 
   GLuint vertexShaderID;
@@ -79,21 +103,14 @@ int main()
     printf("failure");
   }
 
-  //glDeleteShader(vertexShaderID);
-  //glDeleteShader(fragmentShaderID);
+  glDeleteShader(vertexShaderID);
+  glDeleteShader(fragmentShaderID);
 
-  GLfloat squareVertices[] = {
-    -0.5f, -0.5f, 0.0f,
-    -0.5f,  0.5f, 0.0f,
-     0.5f, -0.5f, 0.0f,
-     0.5f,  0.5f, 0.0f
-  };
+  glm::mat4 model, view, projection;
+  model = glm::rotate(model, 20.f, glm::vec3(1.f, 0.f, 0.f));
+  view = glm::translate(view, glm::vec3(0.f, 0.f, -5.f));
+  projection = glm::perspective(45.f, (GLfloat)width / height, 0.1f, 100.f);
 
-  GLuint squareIndices[] = {
-    0, 1, 2,
-    2, 1, 3
-  };
-    
   GLuint VBO, VAO, EBO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
@@ -102,23 +119,41 @@ int main()
   glBindVertexArray(VAO);
   {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(squareVertices), squareVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(squarePlane.vertices), squarePlane.vertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(squareIndices), squareIndices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(squarePlane.indices), squarePlane.indices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
     glEnableVertexAttribArray(0);
   }
 
+  GLfloat dT = 0.f;
+  GLfloat timeAtLastFrameStart = 0.f;
   while(!glfwWindowShouldClose(window))
   {
+    GLfloat timeNow = (GLfloat)glfwGetTime();
+    dT = timeNow - timeAtLastFrameStart;
+    timeAtLastFrameStart = timeNow;
+
     glfwPollEvents();
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+#define ROTATION_SPEED 1.f
+    model = glm::rotate(model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+
+
+    glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(shaderProgramID);
+
+    GLint modelLocation = glGetUniformLocation(shaderProgramID, "model");
+    glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(model));
+    GLint viewLocation = glGetUniformLocation(shaderProgramID, "view");
+    glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
+    GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
+    glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
+
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
