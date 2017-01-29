@@ -7,13 +7,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-struct plane
+struct Plane
 {
   GLfloat vertices[12];
   GLuint indices[12];
 };
 
-static plane squarePlane = {
+static Plane squarePlane = {
   {
     -0.5f, -0.5f, 0.0f,
     -0.5f,  0.5f, 0.0f,
@@ -25,6 +25,50 @@ static plane squarePlane = {
     2, 1, 3
   }
 };
+
+struct Camera
+{
+  glm::vec3 position;
+  glm::vec3 front;
+  glm::vec3 up;
+};
+
+void initCamera(Camera* camera)
+{
+  camera->position = glm::vec3(0.f, 0.f, -5.f);
+  camera->front = glm::vec3(0.f, 0.f, 1.f);
+  camera->up = glm::vec3(0.f, 1.f, 0.f);
+}
+
+static bool keys[1024];
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
+{
+  if(key == GLFW_KEY_ESCAPE)
+  {
+    glfwSetWindowShouldClose(window, GL_TRUE);
+  }
+
+  if(action == GLFW_PRESS)
+  {
+    keys[key] = true;
+  }
+  else if(action == GLFW_RELEASE)
+  {
+    keys[key] = false;
+  }
+}
+
+void updateCamera(Camera* camera, float dT)
+{
+  if(keys[GLFW_KEY_W])
+    camera->position += camera->front * dT;
+  if(keys[GLFW_KEY_S])
+    camera->position -= camera->front * dT;
+  if(keys[GLFW_KEY_A])
+    camera->position -= glm::normalize(glm::cross(camera->front, camera->up)) * dT;
+  if(keys[GLFW_KEY_D])
+    camera->position += glm::normalize(glm::cross(camera->front, camera->up)) * dT;
+}
 
 int main()
 {
@@ -45,11 +89,13 @@ int main()
 
   glewExperimental = GL_TRUE;
   if (glewInit() != GLEW_OK)
-    {
-      printf("GLEW initialization failure.\n");
-      glfwTerminate();
-      return -1;
-    }
+  {
+    printf("GLEW initialization failure.\n");
+    glfwTerminate();
+    return -1;
+  }
+
+  glfwSetKeyCallback(window, keyCallback);
 
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
@@ -108,7 +154,7 @@ int main()
 
   glm::mat4 model, view, projection;
   model = glm::rotate(model, 20.f, glm::vec3(1.f, 0.f, 0.f));
-  view = glm::translate(view, glm::vec3(0.f, 0.f, -5.f));
+  //view = glm::translate(view, glm::vec3(0.f, 0.f, -5.f));
   projection = glm::perspective(45.f, (GLfloat)width / height, 0.1f, 100.f);
 
   GLuint VBO, VAO, EBO;
@@ -128,6 +174,9 @@ int main()
     glEnableVertexAttribArray(0);
   }
 
+  Camera camera;
+  initCamera(&camera);
+
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
   while(!glfwWindowShouldClose(window))
@@ -140,7 +189,9 @@ int main()
 
 #define ROTATION_SPEED 1.f
     model = glm::rotate(model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
-
+    //cameraPosition += cameraFront * dT;
+    updateCamera(&camera, dT);
+    view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
     glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
