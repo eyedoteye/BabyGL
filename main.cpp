@@ -81,6 +81,10 @@ void updateCamera(Camera* camera, GLfloat xOffset, GLfloat yOffset, float dT)
     camera->position -= glm::normalize(glm::cross(camera->front, camera->up)) * dT;
   if(keys[GLFW_KEY_D])
     camera->position += glm::normalize(glm::cross(camera->front, camera->up)) * dT;
+  if(keys[GLFW_KEY_SPACE])
+    camera->position += camera->up * dT;
+  if(keys[GLFW_KEY_LEFT_SHIFT])
+    camera->position -= camera->up * dT;
 
   camera->pitch -= yOffset * 0.05f;
   camera->yaw += xOffset * 0.05f;
