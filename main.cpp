@@ -9,52 +9,63 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <par/par_shapes.h>
 
-struct RenderableMesh
+struct RenderableModel
 {
   par_shapes_mesh* mesh;
   GLuint VAO, VBO, EBO;
+  glm::mat4 model;
 };
 
-void initRenderableMesh(RenderableMesh *mesh, par_shapes_mesh *shapeMesh)
+void updateRenderableModel(RenderableModel *renderableModel)
 {
-  mesh->mesh = shapeMesh;
-
-  glGenVertexArrays(1, &mesh->VAO);
-  glGenBuffers(1, &mesh->VBO);
-  glGenBuffers(1, &mesh->EBO);
-
-  glBindVertexArray(mesh->VAO);
+  glBindVertexArray(renderableModel->VAO);
   {
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, renderableModel->VBO);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(*shapeMesh->points) * shapeMesh->npoints * 3,
-                 shapeMesh->points,
+                 sizeof(*renderableModel->mesh->points) * renderableModel->mesh->npoints * 3,
+                 renderableModel->mesh->points,
                  GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderableModel->EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 sizeof(*shapeMesh->triangles) * shapeMesh->ntriangles * 3,
-                 shapeMesh->triangles,
+                 sizeof(*renderableModel->mesh->triangles) * renderableModel->mesh->ntriangles * 3,
+                 renderableModel->mesh->triangles,
                  GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(*shapeMesh->points), (GLvoid*)0);
+    glVertexAttribPointer(0, 3,
+                          GL_FLOAT, GL_FALSE,
+                          3 * sizeof(*renderableModel->mesh->points), (GLvoid*)0);
     glEnableVertexAttribArray(0);
   }
 }
 
-void drawRenderableMesh(RenderableMesh *mesh)
+void initRenderableModel(RenderableModel *renderableModel, par_shapes_mesh *shapeMesh)
 {
-  glBindVertexArray(mesh->VAO);
-  glDrawElements(GL_TRIANGLES, mesh->mesh->ntriangles * 3, GL_UNSIGNED_SHORT, 0);
+  renderableModel->mesh = shapeMesh;
+
+  glGenVertexArrays(1, &renderableModel->VAO);
+  glGenBuffers(1, &renderableModel->VBO);
+  glGenBuffers(1, &renderableModel->EBO);
+
+  updateRenderableModel(renderableModel);
+}
+
+void drawRenderableModel(RenderableModel *renderableModel, GLint shaderProgramID)
+{
+  GLint modelLocation = glGetUniformLocation(shaderProgramID, "model");
+  glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(renderableModel->model));
+
+  glBindVertexArray(renderableModel->VAO);
+  glDrawElements(GL_TRIANGLES, renderableModel->mesh->ntriangles * 3, GL_UNSIGNED_SHORT, 0);
   glBindVertexArray(0);
 }
 
-void destroyRenderableMesh(RenderableMesh *mesh)
+void destroyRenderableModel(RenderableModel *renderableModel)
 {
   GLuint buffers[3];
-  buffers[0] = mesh->VAO;
-  buffers[1] = mesh->VBO;
-  buffers[2] = mesh->EBO;
+  buffers[0] = renderableModel->VAO;
+  buffers[1] = renderableModel->VBO;
+  buffers[2] = renderableModel->EBO;
   glDeleteBuffers(3, buffers);
 }
 
@@ -217,7 +228,7 @@ int main()
   glDeleteShader(fragmentShaderID);
 
   glm::mat4 model, view, projection;
-  model = glm::rotate(model, 20.f, glm::vec3(1.f, 0.f, 0.f));
+  //model = glm::rotate(model, 20.f, glm::vec3(1.f, 0.f, 0.f));
   //view = glm::translate(view, glm::vec3(0.f, 0.f, -5.f));
   projection = glm::perspective(45.f, (GLfloat)width / height, 0.1f, 100.f);
 
@@ -228,8 +239,13 @@ int main()
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
   mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
 
-  RenderableMesh cube;
-  initRenderableMesh(&cube, par_shapes_create_cube());
+  RenderableModel cube;
+  initRenderableModel(&cube, par_shapes_create_cube());
+  RenderableModel cube2;
+  initRenderableModel(&cube2, par_shapes_create_tetrahedron());
+  cube2.model = glm::translate(cube2.model, glm::vec3(0.f, 1.f, 5.f));
+  //par_shapes_translate(cube2.mesh, 5, 1, 0);
+  //updateRenderableModel(&cube2);
 
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
@@ -237,6 +253,7 @@ int main()
   {
     GLfloat timeNow = (GLfloat)glfwGetTime();
     dT = timeNow - timeAtLastFrameStart;
+
     timeAtLastFrameStart = timeNow;
 
     glfwPollEvents();
@@ -254,7 +271,9 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define ROTATION_SPEED 1.f
-    model = glm::rotate(model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+    cube.model = glm::rotate(cube.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+    cube2.model = glm::rotate(cube2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
+
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
     glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
@@ -262,14 +281,13 @@ int main()
 
     glUseProgram(shaderProgramID);
 
-    GLint modelLocation = glGetUniformLocation(shaderProgramID, "model");
-    glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(model));
     GLint viewLocation = glGetUniformLocation(shaderProgramID, "view");
     glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
     GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
     glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
 
-    drawRenderableMesh(&cube);
+    drawRenderableModel(&cube, shaderProgramID);
+    drawRenderableModel(&cube2, shaderProgramID);
 
     GLenum err;
     while((err = glGetError()) != GL_NO_ERROR)
@@ -281,7 +299,7 @@ int main()
   }
 
   par_shapes_free_mesh(cube.mesh);
-  destroyRenderableMesh(&cube);
+  destroyRenderableModel(&cube);
 
   glfwTerminate();
 
