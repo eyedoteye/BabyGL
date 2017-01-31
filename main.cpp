@@ -9,24 +9,54 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <par/par_shapes.h>
 
-struct Plane
+struct RenderableMesh
 {
-  GLfloat vertices[12];
-  GLuint indices[12];
+  par_shapes_mesh* mesh;
+  GLuint VAO, VBO, EBO;
 };
 
-static Plane squarePlane = {
+void initRenderableMesh(RenderableMesh *mesh, par_shapes_mesh *shapeMesh)
+{
+  mesh->mesh = shapeMesh;
+
+  glGenVertexArrays(1, &mesh->VAO);
+  glGenBuffers(1, &mesh->VBO);
+  glGenBuffers(1, &mesh->EBO);
+
+  glBindVertexArray(mesh->VAO);
   {
-    -0.5f, -0.5f, 0.0f,
-    -0.5f,  0.5f, 0.0f,
-    0.5f, -0.5f, 0.0f,
-    0.5f,  0.5f, 0.0f
-  },
-  {
-    0, 1, 2,
-    2, 1, 3
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->VBO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(*shapeMesh->points) * shapeMesh->npoints * 3,
+                 shapeMesh->points,
+                 GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 sizeof(*shapeMesh->triangles) * shapeMesh->ntriangles * 3,
+                 shapeMesh->triangles,
+                 GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(*shapeMesh->points), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
   }
-};
+}
+
+void drawRenderableMesh(RenderableMesh *mesh)
+{
+  glBindVertexArray(mesh->VAO);
+  glDrawElements(GL_TRIANGLES, mesh->mesh->ntriangles * 3, GL_UNSIGNED_SHORT, 0);
+  glBindVertexArray(0);
+}
+
+void destroyRenderableMesh(RenderableMesh *mesh)
+{
+  GLuint buffers[3];
+  buffers[0] = mesh->VAO;
+  buffers[1] = mesh->VBO;
+  buffers[2] = mesh->EBO;
+  glDeleteBuffers(3, buffers);
+}
 
 struct Camera
 {
@@ -191,33 +221,6 @@ int main()
   //view = glm::translate(view, glm::vec3(0.f, 0.f, -5.f));
   projection = glm::perspective(45.f, (GLfloat)width / height, 0.1f, 100.f);
 
-  GLuint VBO, VAO, EBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
-
-  par_shapes_mesh* shape = par_shapes_create_cube();
-  //par_shapes_translate(shape, 0.f, 0.f, 0.f);
-
-  glBindVertexArray(VAO);
-  {
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(*shape->points) * shape->npoints * 3,
-                 shape->points,
-                 GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 sizeof(*shape->triangles) * shape->ntriangles * 3,
-                 shape->triangles,
-                 GL_STATIC_DRAW);
-
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(*shape->points), (GLvoid*)0);
-    glEnableVertexAttribArray(0);
-  }
-
   Camera camera;
   initCamera(&camera);
 
@@ -225,15 +228,13 @@ int main()
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
   mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
 
+  RenderableMesh cube;
+  initRenderableMesh(&cube, par_shapes_create_cube());
+
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
-  bool firstFrame = true;
   while(!glfwWindowShouldClose(window))
   {
-    //printf("MouseX:%f\tMouseY:%f\t"
-    //     "Camera.Yaw:%f\tCamera.Pitch:%f\n",
-    //       mouseCoords[0], mouseCoords[1],
-    //       camera.yaw, camera.pitch);
     GLfloat timeNow = (GLfloat)glfwGetTime();
     dT = timeNow - timeAtLastFrameStart;
     timeAtLastFrameStart = timeNow;
@@ -254,7 +255,6 @@ int main()
 
 #define ROTATION_SPEED 1.f
     model = glm::rotate(model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
-    //cameraPosition += cameraFront * dT;
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
     glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
@@ -269,9 +269,7 @@ int main()
     GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
     glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
 
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6 * 3 * 2, GL_UNSIGNED_SHORT, 0);
-    glBindVertexArray(0);
+    drawRenderableMesh(&cube);
 
     GLenum err;
     while((err = glGetError()) != GL_NO_ERROR)
@@ -280,8 +278,10 @@ int main()
     }
 
     glfwSwapBuffers(window);
-    firstFrame = false;
   }
+
+  par_shapes_free_mesh(cube.mesh);
+  destroyRenderableMesh(&cube);
 
   glfwTerminate();
 
