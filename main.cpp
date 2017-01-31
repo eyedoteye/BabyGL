@@ -14,6 +14,7 @@ struct RenderableModel
   par_shapes_mesh* mesh;
   GLuint VAO, VBO, EBO;
   glm::mat4 model;
+  glm::vec4 color;
 };
 
 void updateRenderableModel(RenderableModel *renderableModel)
@@ -42,6 +43,7 @@ void updateRenderableModel(RenderableModel *renderableModel)
 void initRenderableModel(RenderableModel *renderableModel, par_shapes_mesh *shapeMesh)
 {
   renderableModel->mesh = shapeMesh;
+  renderableModel->color = glm::vec4(.7f, .7f, .7f, 1.f);
 
   glGenVertexArrays(1, &renderableModel->VAO);
   glGenBuffers(1, &renderableModel->VBO);
@@ -54,6 +56,8 @@ void drawRenderableModel(RenderableModel *renderableModel, GLint shaderProgramID
 {
   GLint modelLocation = glGetUniformLocation(shaderProgramID, "model");
   glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(renderableModel->model));
+  GLint objectColorLocation = glGetUniformLocation(shaderProgramID, "objectColor");
+  glUniform4fv(objectColorLocation, 1, glm::value_ptr(renderableModel->color));
 
   glBindVertexArray(renderableModel->VAO);
   glDrawElements(GL_TRIANGLES, renderableModel->mesh->ntriangles * 3, GL_UNSIGNED_SHORT, 0);
@@ -175,7 +179,7 @@ int main()
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
   glViewport(0, 0, width, height);
-  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
   GLchar* vertexShaderSource =
     "#version 400 core\n"
@@ -190,10 +194,11 @@ int main()
 
   GLchar* fragmentShaderSource =
     "#version 400 core\n"
+    "uniform vec4 objectColor;"
     "out vec4 color;"
     "void main()"
     "{"
-    " color = vec4(0.7f, 0.7f, 0.7f, 1.0f);"
+    " color = objectColor;"
     "}";
 
   GLuint vertexShaderID;
@@ -239,13 +244,12 @@ int main()
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
   mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
 
-  RenderableModel cube;
-  initRenderableModel(&cube, par_shapes_create_cube());
-  RenderableModel cube2;
-  initRenderableModel(&cube2, par_shapes_create_tetrahedron());
-  cube2.model = glm::translate(cube2.model, glm::vec3(0.f, 1.f, 5.f));
-  //par_shapes_translate(cube2.mesh, 5, 1, 0);
-  //updateRenderableModel(&cube2);
+  RenderableModel shape;
+  initRenderableModel(&shape, par_shapes_create_cube());
+  RenderableModel shape2;
+  initRenderableModel(&shape2, par_shapes_create_tetrahedron());
+  shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, 5.f));
+  shape2.color = glm::vec4(.2f, 1.f, 1.f, 1.f);
 
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
@@ -271,8 +275,8 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define ROTATION_SPEED 1.f
-    cube.model = glm::rotate(cube.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
-    cube2.model = glm::rotate(cube2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
+    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
 
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
@@ -286,20 +290,20 @@ int main()
     GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
     glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
 
-    drawRenderableModel(&cube, shaderProgramID);
-    drawRenderableModel(&cube2, shaderProgramID);
+    drawRenderableModel(&shape, shaderProgramID);
+    drawRenderableModel(&shape2, shaderProgramID);
 
     GLenum err;
     while((err = glGetError()) != GL_NO_ERROR)
     {
-      printf("Error: %i", err);
+      printf("Error: %i\n", err);
     }
 
     glfwSwapBuffers(window);
   }
 
-  par_shapes_free_mesh(cube.mesh);
-  destroyRenderableModel(&cube);
+  par_shapes_free_mesh(shape.mesh);
+  destroyRenderableModel(&shape);
 
   glfwTerminate();
 
