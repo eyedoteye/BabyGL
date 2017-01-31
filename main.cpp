@@ -1,13 +1,16 @@
 #include <stdio.h>
 
 #define GLEW_STATIC
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#pragma warning(push)
+#pragma warning(disable:4244 4996 4305 4838 4456 4100)
 #include <par/par_shapes.h>
+#pragma warning(pop)
 
 struct RenderableModel
 {
@@ -107,6 +110,8 @@ void initCamera(Camera* camera)
   camera->pitch = 0.f;
 }
 
+#pragma warning(push)
+#pragma warning(disable:4100)
 static bool keys[1024];
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
@@ -131,6 +136,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
   mouseCoords[0] = (GLfloat)xpos;
   mouseCoords[1] = (GLfloat)ypos;
 }
+#pragma warning(pop)
 
 void updateCamera(Camera* camera, GLfloat xOffset, GLfloat yOffset, float dT)
 {
@@ -332,7 +338,7 @@ int main()
     drawRenderableModel(&shape2, shaderProgramID);
 
     GLenum err;
-    bool shouldQuit;
+    bool shouldQuit = false;
     while((err = glGetError()) != GL_NO_ERROR)
     {
       printf("Error: %i\n", err);
