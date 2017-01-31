@@ -196,45 +196,25 @@ int main()
   glGenBuffers(1, &VBO);
   glGenBuffers(1, &EBO);
 
-  //par_shapes_mesh* shape = par_shapes_create_cube();
+  par_shapes_mesh* shape = par_shapes_create_cube();
   //par_shapes_translate(shape, 0.f, 0.f, 0.f);
-
-  GLfloat testverts[8 * 3] = {
-    0, 0, 0, // 0
-    0, 1, 0, // 1
-    1, 1, 0, // 2
-    1, 0, 0, // 3
-    0, 0, 1, // 4
-    0, 1, 1, // 5
-    1, 1, 1, // 6
-    1, 0, 1, // 7
-  };
-
-  GLuint quads[6 * 3 * 2] = {
-    7,6,5, 5,4,7, // front
-    0,1,2, 2,3,0, // back
-    6,7,3, 3,2,6, // right
-    5,6,2, 2,1,5, // top
-    4,5,1, 1,0,4, // left
-    7,4,0, 0,3,7 // bottom
-  };
 
   glBindVertexArray(VAO);
   {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(GLfloat) * 8 * 3,
-                 &testverts,
+                 sizeof(*shape->points) * shape->npoints * 3,
+                 shape->points,
                  GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 sizeof(GLuint) * 6 * 3 * 2,
-                 &quads,
+                 sizeof(*shape->triangles) * shape->ntriangles * 3,
+                 shape->triangles,
                  GL_STATIC_DRAW);
 
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(GL_FLOAT), (GLvoid*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 3 * sizeof(*shape->points), (GLvoid*)0);
     glEnableVertexAttribArray(0);
   }
 
@@ -290,7 +270,7 @@ int main()
     glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
 
     glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6 * 3 * 2, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, 6 * 3 * 2, GL_UNSIGNED_SHORT, 0);
     glBindVertexArray(0);
 
     GLenum err;
