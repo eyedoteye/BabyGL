@@ -12,7 +12,7 @@
 struct RenderableModel
 {
   par_shapes_mesh* mesh;
-  GLuint VAO, VBO, EBO;
+  GLuint VAO, VBO, EBO, VBNO;
   glm::mat4 model;
   glm::vec4 color;
 };
@@ -37,6 +37,16 @@ void updateRenderableModel(RenderableModel *renderableModel)
                           GL_FLOAT, GL_FALSE,
                           3 * sizeof(*renderableModel->mesh->points), (GLvoid*)0);
     glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, renderableModel->VBNO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(*renderableModel->mesh->normals) * renderableModel->mesh->npoints * 3,
+                 renderableModel->mesh->normals,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 3,
+                          GL_FLOAT, GL_FALSE,
+                          3 * sizeof(*renderableModel->mesh->normals), (GLvoid*)0);
+    glEnableVertexAttribArray(1);
   }
 }
 
@@ -45,9 +55,13 @@ void initRenderableModel(RenderableModel *renderableModel, par_shapes_mesh *shap
   renderableModel->mesh = shapeMesh;
   renderableModel->color = glm::vec4(.7f, .7f, .7f, 1.f);
 
+  par_shapes_unweld(shapeMesh, true);
+  par_shapes_compute_normals(shapeMesh);
+
   glGenVertexArrays(1, &renderableModel->VAO);
   glGenBuffers(1, &renderableModel->VBO);
   glGenBuffers(1, &renderableModel->EBO);
+  glGenBuffers(1, &renderableModel->VBNO);
 
   updateRenderableModel(renderableModel);
 }
@@ -184,21 +198,34 @@ int main()
   GLchar* vertexShaderSource =
     "#version 400 core\n"
     "layout (location = 0) in vec3 position;"
+    "layout (location = 1) in vec3 normal;"
     "uniform mat4 model;"
     "uniform mat4 view;"
     "uniform mat4 projection;"
+    "out vec3 fragmentNormal;"
+    "out vec3 fragmentPosition;"
     "void main()"
     "{"
     " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.0);"
+    " fragmentPosition = vec3(model * vec4(position, 1.0f));"
+    " fragmentNormal = normal;"
     "}";
 
   GLchar* fragmentShaderSource =
     "#version 400 core\n"
+    "uniform vec3 lightPosition;"
+    "uniform vec3 lightColor;"
     "uniform vec4 objectColor;"
+    "in vec3 fragmentNormal;"
+    "in vec3 fragmentPosition;"
     "out vec4 color;"
     "void main()"
     "{"
-    " color = objectColor;"
+    " vec3 norm = normalize(fragmentNormal);"
+    " vec3 lightDirection = normalize(lightPosition - fragmentPosition);"
+    " float diffuseImpact = max(dot(norm, lightDirection), 0.0);"
+    " vec3 diffuse = diffuseImpact * lightColor;"
+    " color = vec4(diffuse * objectColor.xyz, objectColor.w);"
     "}";
 
   GLuint vertexShaderID;
@@ -217,16 +244,19 @@ int main()
   glLinkProgram(shaderProgramID);
 
   GLint success;
+  GLchar infoLog[512];
   glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &success);
   if(!success)
   {
-    printf("failure");
+    glGetShaderInfoLog(fragmentShaderID, 512, NULL, infoLog);
+    printf("Fragment Shader Compilation Failure: %s", infoLog);
   }
 
   glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &success);
   if(!success)
   {
-    printf("failure");
+    glGetShaderInfoLog(fragmentShaderID, 512, NULL, infoLog);
+    printf("Vertex Shader Compilation Failure: %s", infoLog);
   }
 
   glDeleteShader(vertexShaderID);
@@ -240,9 +270,8 @@ int main()
   Camera camera;
   initCamera(&camera);
 
-  GLfloat mouseCoordsAtLastFrameStart[2];
-  mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
-  mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
+  glm::vec3 lightPosition = glm::vec3(0.f, 5.f, -2.f);
+  glm::vec3 lightColor = glm::vec3(1.f);
 
   RenderableModel shape;
   initRenderableModel(&shape, par_shapes_create_cube());
@@ -250,6 +279,10 @@ int main()
   initRenderableModel(&shape2, par_shapes_create_tetrahedron());
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, 5.f));
   shape2.color = glm::vec4(.2f, 1.f, 1.f, 1.f);
+
+  GLfloat mouseCoordsAtLastFrameStart[2];
+  mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
+  mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
 
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
@@ -285,6 +318,10 @@ int main()
 
     glUseProgram(shaderProgramID);
 
+    GLint lightPositionLocation = glGetUniformLocation(shaderProgramID, "lightPosition");
+    glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
+    GLint lightColorLocation = glGetUniformLocation(shaderProgramID, "lightColor");
+    glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
     GLint viewLocation = glGetUniformLocation(shaderProgramID, "view");
     glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
     GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
@@ -294,9 +331,15 @@ int main()
     drawRenderableModel(&shape2, shaderProgramID);
 
     GLenum err;
+    bool shouldQuit;
     while((err = glGetError()) != GL_NO_ERROR)
     {
       printf("Error: %i\n", err);
+      shouldQuit = true;
+    }
+    if(shouldQuit)
+    {
+      glfwSetWindowShouldClose(window, GL_TRUE);
     }
 
     glfwSwapBuffers(window);
