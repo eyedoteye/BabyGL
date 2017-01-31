@@ -220,6 +220,7 @@ int main()
 
   GLchar* fragmentShaderSource =
     "#version 400 core\n"
+    "uniform vec3 viewPosition;"
     "uniform vec3 lightPosition;"
     "uniform vec3 lightColor;"
     "uniform vec4 objectColor;"
@@ -232,7 +233,12 @@ int main()
     " vec3 lightDirection = normalize(lightPosition - fragmentPosition);"
     " float diffuseImpact = max(dot(norm, lightDirection), 0.0);"
     " vec3 diffuse = diffuseImpact * lightColor;"
-    " color = vec4(diffuse * objectColor.xyz, objectColor.w);"
+    " float specularImpact = 0.5f;"
+    " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
+    " vec3 reflectDirection = reflect(-lightDirection, norm);"
+    " float spec = pow(max(dot(viewDirection, reflectDirection), 0.0f), 32);"
+    " vec3 specular = specularImpact * spec * lightColor;"
+    " color = vec4((diffuse + specular) * objectColor.xyz, objectColor.w);"
     "}";
 
   GLuint vertexShaderID;
@@ -325,6 +331,8 @@ int main()
 
     glUseProgram(shaderProgramID);
 
+    GLint viewPositionLocation = glGetUniformLocation(shaderProgramID, "viewPosition");
+    glUniform3f(viewPositionLocation, camera.position.x, camera.position.y, camera.position.z);
     GLint lightPositionLocation = glGetUniformLocation(shaderProgramID, "lightPosition");
     glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
     GLint lightColorLocation = glGetUniformLocation(shaderProgramID, "lightColor");
