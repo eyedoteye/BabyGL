@@ -213,8 +213,8 @@ int main()
     "out vec3 fragmentPosition;"
     "void main()"
     "{"
-    " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.0);"
-    " fragmentPosition = vec3(model * vec4(position, 1.0f));"
+    " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.f);"
+    " fragmentPosition = vec3(model * vec4(position, 1.f));"
     " fragmentNormal = mat3(transpose(inverse(model))) * normal;"
     "}";
 
@@ -229,16 +229,18 @@ int main()
     "out vec4 color;"
     "void main()"
     "{"
+    " float ambientImpact = 0.1f;"
+    " vec3 ambient = ambientImpact * lightColor;"
     " vec3 norm = normalize(fragmentNormal);"
     " vec3 lightDirection = normalize(lightPosition - fragmentPosition);"
-    " float diffuseImpact = max(dot(norm, lightDirection), 0.0);"
+    " float diffuseImpact = max(dot(norm, lightDirection), 0.f);"
     " vec3 diffuse = diffuseImpact * lightColor;"
     " float specularImpact = 0.5f;"
     " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
     " vec3 reflectDirection = reflect(-lightDirection, norm);"
-    " float spec = pow(max(dot(viewDirection, reflectDirection), 0.0f), 32);"
+    " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 32);"
     " vec3 specular = specularImpact * spec * lightColor;"
-    " color = vec4((diffuse + specular) * objectColor.xyz, objectColor.w);"
+    " color = vec4((ambient + diffuse + specular) * objectColor.xyz, objectColor.w);"
     "}";
 
   GLuint vertexShaderID;
