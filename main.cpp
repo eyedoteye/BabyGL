@@ -209,7 +209,7 @@ int main()
     "{"
     " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.0);"
     " fragmentPosition = vec3(model * vec4(position, 1.0f));"
-    " fragmentNormal = normal;"
+    " fragmentNormal = mat3(transpose(inverse(model))) * normal;"
     "}";
 
   GLchar* fragmentShaderSource =
