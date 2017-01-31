@@ -194,6 +194,7 @@ int main()
   glfwGetFramebufferSize(window, &width, &height);
   glViewport(0, 0, width, height);
   //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glEnable(GL_DEPTH_TEST);
 
   GLchar* vertexShaderSource =
     "#version 400 core\n"
@@ -314,7 +315,7 @@ int main()
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
     glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shaderProgramID);
 
