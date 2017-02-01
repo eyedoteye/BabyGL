@@ -236,6 +236,7 @@ int main()
     " float diffuseImpact = max(dot(norm, lightDirection), 0.f);"
     " vec3 diffuse = diffuseImpact * lightColor;"
     " float specularImpact = 0.5f;"
+    //
     " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
     " vec3 reflectDirection = reflect(-lightDirection, norm);"
     " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 32);"
@@ -253,29 +254,137 @@ int main()
   glShaderSource(fragmentShaderID, 1, &fragmentShaderSource, NULL);
   glCompileShader(fragmentShaderID);
 
+  {
+    GLint success;
+    GLchar infoLog[512];
+    glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+      {
+        glGetShaderInfoLog(fragmentShaderID, 512, NULL, infoLog);
+        printf("Fragment Shader Compilation Failure: %s", infoLog);
+      }
+
+    glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+      {
+        glGetShaderInfoLog(vertexShaderID, 512, NULL, infoLog);
+        printf("Vertex Shader Compilation Failure: %s", infoLog);
+      }
+  }
+
   GLuint shaderProgramID = glCreateProgram();
   glAttachShader(shaderProgramID, vertexShaderID);
   glAttachShader(shaderProgramID, fragmentShaderID);
   glLinkProgram(shaderProgramID);
 
-  GLint success;
-  GLchar infoLog[512];
-  glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &success);
-  if(!success)
   {
-    glGetShaderInfoLog(fragmentShaderID, 512, NULL, infoLog);
-    printf("Fragment Shader Compilation Failure: %s", infoLog);
-  }
-
-  glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &success);
-  if(!success)
-  {
-    glGetShaderInfoLog(fragmentShaderID, 512, NULL, infoLog);
-    printf("Vertex Shader Compilation Failure: %s", infoLog);
+    GLint success;
+    GLchar infoLog[512];
+    glGetProgramiv(shaderProgramID, GL_LINK_STATUS, &success);
+    if(!success)
+      {
+        glGetProgramInfoLog(shaderProgramID, 512, NULL, infoLog);
+        printf("Shader Program Link Failure: %s", infoLog);
+      }
   }
 
   glDeleteShader(vertexShaderID);
   glDeleteShader(fragmentShaderID);
+
+  GLchar* volumetricVertexShaderSource =
+    "#version 400 core\n"
+    "layout (location = 0) in vec3 position;"
+    //"layout (location = 1) in vec3 normal;"
+    "uniform mat4 model;"
+    "uniform mat4 view;"
+    "uniform mat4 projection;"
+    "out vec3 fragmentPosition;"
+    "out vec3 objectPosition;"
+    "void main()"
+    "{"
+    " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.f);"
+    " objectPosition = gl_Position.xyz;"
+    " fragmentPosition = vec3(model * vec4(position, 1.f));"
+    "}";
+
+  GLchar* volumetricFragmentShaderSource =
+    "#version 400 core\n"
+    "uniform vec3 viewPosition;"
+    "uniform vec4 objectColor;"
+    "in vec3 objectPosition;"
+    "in vec3 fragmentPosition;"
+    "out vec4 color;"
+    "bool sphereHit(vec3 position)"
+    "{"
+    " vec3 sphereCenter = vec3(0.5f, 0.5f, 0.5f);"
+    " float sphereRadius = .5f;"
+    " return distance(position, sphereCenter) < sphereRadius;"
+    "}"
+    "bool raymarchHit(vec3 position, vec3 direction)"
+    "{"
+    " for(int i = 0; i < 64; i++)"
+    " {"
+    "  if(sphereHit(position))"
+    "   return true;"
+    "  position += direction * 0.01f;"
+    " }"
+    " return false;"
+    "}"
+    "void main()"
+    "{"
+    " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
+    " if(raymarchHit(fragmentPosition, -viewDirection))"
+    //" if(true)"
+    "  color = vec4(1.f, 0.f, 0.f, 1.f);"
+    " else"
+    "  color = objectColor;"
+    "}";
+
+  GLuint volumetricVertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(volumetricVertexShaderID, 1, &volumetricVertexShaderSource, NULL);
+  glCompileShader(volumetricVertexShaderID);
+
+  GLuint volumetricFragmentShaderID;
+  volumetricFragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(volumetricFragmentShaderID, 1, &volumetricFragmentShaderSource, NULL);
+  glCompileShader(volumetricFragmentShaderID);
+
+  {
+    GLint success;
+    GLchar infoLog[512];
+    glGetShaderiv(volumetricFragmentShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+      {
+        glGetShaderInfoLog(volumetricFragmentShaderID, 512, NULL, infoLog);
+        printf("VolumetricFragment Shader Compilation Failure: %s", infoLog);
+      }
+
+    glGetShaderiv(volumetricVertexShaderID, GL_COMPILE_STATUS, &success);
+    if(!success)
+      {
+        glGetShaderInfoLog(volumetricVertexShaderID, 512, NULL, infoLog);
+        printf("VolumetricVertex Shader Compilation Failure: %s", infoLog);
+      }
+  }
+
+  GLuint volumetricShaderProgramID = glCreateProgram();
+  glAttachShader(volumetricShaderProgramID, volumetricVertexShaderID);
+  glAttachShader(volumetricShaderProgramID, volumetricFragmentShaderID);
+  glLinkProgram(volumetricShaderProgramID);
+
+  {
+    GLint success;
+    GLchar infoLog[512];
+    glGetProgramiv(volumetricShaderProgramID, GL_LINK_STATUS, &success);
+    if(!success)
+      {
+        glGetProgramInfoLog(volumetricShaderProgramID, 512, NULL, infoLog);
+        printf("VolumetricShader Program Link Failure: %s", infoLog);
+      }
+  }
+
+  glDeleteShader(volumetricVertexShaderID);
+  glDeleteShader(volumetricFragmentShaderID);
 
   glm::mat4 model, view, projection;
   //model = glm::rotate(model, 20.f, glm::vec3(1.f, 0.f, 0.f));
@@ -323,7 +432,7 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define ROTATION_SPEED 1.f
-    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+    //shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
@@ -336,19 +445,33 @@ int main()
 
     glUseProgram(shaderProgramID);
 
-    GLint viewPositionLocation = glGetUniformLocation(shaderProgramID, "viewPosition");
-    glUniform3f(viewPositionLocation, camera.position.x, camera.position.y, camera.position.z);
-    GLint lightPositionLocation = glGetUniformLocation(shaderProgramID, "lightPosition");
-    glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
-    GLint lightColorLocation = glGetUniformLocation(shaderProgramID, "lightColor");
-    glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
-    GLint viewLocation = glGetUniformLocation(shaderProgramID, "view");
-    glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
-    GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
-    glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
-
-    drawRenderableModel(&shape, shaderProgramID);
+    {
+      GLint viewPositionLocation = glGetUniformLocation(shaderProgramID, "viewPosition");
+      glUniform3f(viewPositionLocation, camera.position.x, camera.position.y, camera.position.z);
+      GLint lightPositionLocation = glGetUniformLocation(shaderProgramID, "lightPosition");
+      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
+      GLint lightColorLocation = glGetUniformLocation(shaderProgramID, "lightColor");
+      glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
+      GLint viewLocation = glGetUniformLocation(shaderProgramID, "view");
+      glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
+      GLint projectionLocation = glGetUniformLocation(shaderProgramID, "projection");
+      glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
+    }
     drawRenderableModel(&shape2, shaderProgramID);
+
+    glUseProgram(volumetricShaderProgramID);
+
+    //Note: For volumetricShader
+    {
+      GLint viewPositionLocation = glGetUniformLocation(volumetricShaderProgramID, "viewPosition");
+      glUniform3f(viewPositionLocation, camera.position.x, camera.position.y, camera.position.z);
+      GLint viewLocation = glGetUniformLocation(volumetricShaderProgramID, "view");
+      glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
+      GLint projectionLocation = glGetUniformLocation(volumetricShaderProgramID, "projection");
+      glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(projection));
+    }
+
+    drawRenderableModel(&shape, volumetricShaderProgramID);
 
     GLenum err;
     bool shouldQuit = false;
@@ -367,6 +490,9 @@ int main()
 
   par_shapes_free_mesh(shape.mesh);
   destroyRenderableModel(&shape);
+
+  par_shapes_free_mesh(shape2.mesh);
+  destroyRenderableModel(&shape2);
 
   glfwTerminate();
 
