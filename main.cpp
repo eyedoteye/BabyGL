@@ -316,7 +316,7 @@ int main()
     "out vec4 color;"
     "bool sphereHit(vec3 position)"
     "{"
-    " vec3 sphereCenter = vec3(0.5f, 0.5f, 0.5f);"
+    " vec3 sphereCenter = vec3(0.5f);"
     " float sphereRadius = .5f;"
     " return distance(position, sphereCenter) < sphereRadius;"
     "}"
@@ -399,6 +399,8 @@ int main()
 
   RenderableModel shape;
   initRenderableModel(&shape, par_shapes_create_cube());
+  shape.model = glm::translate(shape.model, glm::vec3(0.f, 0.f, 0.f));
+
   RenderableModel shape2;
   initRenderableModel(&shape2, par_shapes_create_tetrahedron());
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, 5.f));
@@ -432,7 +434,7 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define ROTATION_SPEED 1.f
-    //shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
+    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
