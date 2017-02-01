@@ -236,7 +236,6 @@ int main()
     " float diffuseImpact = max(dot(norm, lightDirection), 0.f);"
     " vec3 diffuse = diffuseImpact * lightColor;"
     " float specularImpact = 0.5f;"
-    //
     " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
     " vec3 reflectDirection = reflect(-lightDirection, norm);"
     " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 32);"
@@ -294,24 +293,29 @@ int main()
   GLchar* volumetricVertexShaderSource =
     "#version 400 core\n"
     "layout (location = 0) in vec3 position;"
-    //"layout (location = 1) in vec3 normal;"
+    "layout (location = 1) in vec3 normal;"
     "uniform mat4 model;"
     "uniform mat4 view;"
     "uniform mat4 projection;"
     "out vec3 fragmentPosition;"
+    "out vec3 fragmentNormal;"
     "out vec3 objectPosition;"
     "void main()"
     "{"
     " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.f);"
     " objectPosition = gl_Position.xyz;"
     " fragmentPosition = vec3(model * vec4(position, 1.f));"
+    " fragmentNormal = mat3(transpose(inverse(model))) * normal;"
     "}";
 
   GLchar* volumetricFragmentShaderSource =
     "#version 400 core\n"
+    "uniform vec3 lightPosition;"
+    "uniform vec3 lightColor;"
     "uniform vec3 viewPosition;"
     "uniform vec4 objectColor;"
     "in vec3 objectPosition;"
+    "in vec3 fragmentNormal;"
     "in vec3 fragmentPosition;"
     "out vec4 color;"
     "bool sphereHit(vec3 position)"
@@ -334,10 +338,22 @@ int main()
     "{"
     " vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
     " if(raymarchHit(fragmentPosition, -viewDirection))"
-    //" if(true)"
     "  color = vec4(1.f, 0.f, 0.f, 1.f);"
     " else"
-    "  color = objectColor;"
+    " {"
+    "  float ambientImpact = 0.1f;"
+    "  vec3 ambient = ambientImpact * lightColor;"
+    "  vec3 norm = normalize(fragmentNormal);"
+    "  vec3 lightDirection = normalize(lightPosition - fragmentPosition);"
+    "  float diffuseImpact = max(dot(norm, lightDirection), 0.f);"
+    "  vec3 diffuse = diffuseImpact * lightColor;"
+    "  float specularImpact = 0.5f;"
+    "  vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
+    "  vec3 reflectDirection = reflect(-lightDirection, norm);"
+    "  float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 32);"
+    "  vec3 specular = specularImpact * spec * lightColor;"
+    "  color = vec4((ambient + diffuse + specular) * objectColor.xyz, objectColor.w);"
+    " }"
     "}";
 
   GLuint volumetricVertexShaderID = glCreateShader(GL_VERTEX_SHADER);
@@ -467,6 +483,10 @@ int main()
     {
       GLint viewPositionLocation = glGetUniformLocation(volumetricShaderProgramID, "viewPosition");
       glUniform3f(viewPositionLocation, camera.position.x, camera.position.y, camera.position.z);
+      GLint lightPositionLocation = glGetUniformLocation(volumetricShaderProgramID, "lightPosition");
+      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
+      GLint lightColorLocation = glGetUniformLocation(volumetricShaderProgramID, "lightColor");
+      glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
       GLint viewLocation = glGetUniformLocation(volumetricShaderProgramID, "view");
       glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(view));
       GLint projectionLocation = glGetUniformLocation(volumetricShaderProgramID, "projection");
