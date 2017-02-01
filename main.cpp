@@ -325,6 +325,9 @@ int main()
 #define ROTATION_SPEED 1.f
     shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(1.f, 1.f, 0.f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
+    shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
+    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
+    shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, -5.f));
 
     view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 
