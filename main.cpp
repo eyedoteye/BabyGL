@@ -12,95 +12,9 @@
 #include <par/par_shapes.h>
 #pragma warning(pop)
 
-#include "renderObject.cpp"
-
-struct ShaderObject
-{
-  GLuint vertexShaderID;
-  GLuint fragmentShaderID;
-  GLuint shaderProgramID;
-
-  char* vertexShaderSource;
-  char* fragmentShaderSource;
-};
-
-void compileShaderObject(ShaderObject* shaderObject)
-{
-  shaderObject->vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-  shaderObject->fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-
-  glShaderSource(shaderObject->vertexShaderID, 1,
-                 &shaderObject->vertexShaderSource, NULL);
-  glShaderSource(shaderObject->fragmentShaderID, 1,
-                 &shaderObject->fragmentShaderSource, NULL);
-
-  glCompileShader(shaderObject->vertexShaderID);
-  glCompileShader(shaderObject->fragmentShaderID);
-
-  {
-    GLint success;
-    GLchar infoLog[512];
-    glGetShaderiv(shaderObject->fragmentShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
-    {
-      glGetShaderInfoLog(shaderObject->fragmentShaderID, 512, NULL, infoLog);
-      printf("Fragment Shader Compilation Failure: %s", infoLog);
-    }
-
-    glGetShaderiv(shaderObject->vertexShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
-    {
-      glGetShaderInfoLog(shaderObject->vertexShaderID, 512, NULL, infoLog);
-      printf("Vertex Shader Compilation Failure: %s", infoLog);
-    }
-  }
-}
-
-void linkShaderObject(ShaderObject* shaderObject)
-{
-  shaderObject->shaderProgramID = glCreateProgram();
-  glAttachShader(shaderObject->shaderProgramID,
-                 shaderObject->vertexShaderID);
-  glAttachShader(shaderObject->shaderProgramID,
-                 shaderObject->fragmentShaderID);
-  glLinkProgram(shaderObject->shaderProgramID);
-
-  {
-    GLint success;
-    GLchar infoLog[512];
-    glGetProgramiv(shaderObject->shaderProgramID, GL_LINK_STATUS, &success);
-    if(!success)
-    {
-      glGetProgramInfoLog(shaderObject->shaderProgramID, 512, NULL, infoLog);
-      printf("Shader Program Link Failure: %s", infoLog);
-    }
-  }
-}
-
-struct Camera
-{
-  glm::mat4 projection;
-  glm::mat4 view;
-
-  glm::vec3 position;
-  glm::vec3 front;
-  glm::vec3 up;
-
-  GLfloat yaw;
-  GLfloat pitch;
-};
-
-void initCamera(Camera* camera, GLfloat width, GLfloat height)
-{
-  camera->projection = glm::perspective(45.f, width / height, 0.1f, 100.f);
-
-  camera->position = glm::vec3(0.f, 0.f, -5.f);
-  camera->front = glm::vec3(0.f, 0.f, 1.f);
-  camera->up = glm::vec3(0.f, 1.f, 0.f);
-
-  camera->yaw = 90.f;
-  camera->pitch = 0.f;
-}
+#include "RenderObject.cpp"
+#include "ShaderObject.cpp"
+#include "Camera.cpp"
 
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -129,38 +43,6 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
   mouseCoords[1] = (GLfloat)ypos;
 }
 #pragma warning(pop)
-
-void updateCamera(Camera* camera, GLfloat xOffset, GLfloat yOffset, float dT)
-{
-  if(keys[GLFW_KEY_W])
-    camera->position += camera->front * dT;
-  if(keys[GLFW_KEY_S])
-    camera->position -= camera->front * dT;
-  if(keys[GLFW_KEY_A])
-    camera->position -= glm::normalize(glm::cross(camera->front, camera->up)) * dT;
-  if(keys[GLFW_KEY_D])
-    camera->position += glm::normalize(glm::cross(camera->front, camera->up)) * dT;
-  if(keys[GLFW_KEY_SPACE])
-    camera->position += camera->up * dT;
-  if(keys[GLFW_KEY_LEFT_SHIFT])
-    camera->position -= camera->up * dT;
-
-  camera->pitch -= yOffset * 0.05f;
-  camera->yaw += xOffset * 0.05f;
-
-  camera->pitch = camera->pitch > 89.f ? 89.f : camera->pitch;
-  camera->pitch = camera->pitch < -89.f ? -89.f : camera->pitch;
-
-  glm::vec3 front;
-  front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-  front.y = sin(glm::radians(camera->pitch));
-  front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-  camera->front = glm::normalize(front);
-
-  camera->view = glm::lookAt(camera->position,
-                             camera->position + camera->front,
-                             camera->up);
-}
 
 int main()
 {
@@ -285,6 +167,7 @@ int main()
     updateCamera(&camera,
                  mouseCoordsNow[0] - mouseCoordsAtLastFrameStart[0],
                  mouseCoordsNow[1] - mouseCoordsAtLastFrameStart[1],
+                 keys,
                  dT);
 
     mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
