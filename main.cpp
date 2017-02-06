@@ -157,6 +157,9 @@ int main()
     " vec3 reflectDirection = reflect(-lightDirection, normal);"
     " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 64);"
     " vec3 specular = 1.f * spec * lightColor;"
+    " if(normal == vec3(0.f))"
+    "  fragmentColor = vec4(.4f, .6f, .2f, 1.f);"
+    " else"
     "  fragmentColor = vec4((ambient + diffuse + specular) * objectColor, 1.f);"
     "}";
 
@@ -308,7 +311,6 @@ int main()
     drawRenderObject(&shape, gPassShader.shaderProgramID);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClearColor(0.4f, 0.6f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(lPassShader.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
