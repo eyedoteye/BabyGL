@@ -1,7 +1,7 @@
 struct RenderObject
 {
   par_shapes_mesh* mesh;
-  GLuint VAO, VBO, EBO, VBNO;
+  GLuint VAO, VBO, EBO, VBNO, VBUVO;
   glm::mat4 model;
   glm::vec3 color;
 };
@@ -35,7 +35,17 @@ void updateRenderObject(RenderObject *renderableModel)
     glVertexAttribPointer(1, 3,
                           GL_FLOAT, GL_FALSE,
                           3 * sizeof(*renderableModel->mesh->normals), (GLvoid*)0);
-                          glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, renderableModel->VBUVO);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(*renderableModel->mesh->tcoords) * renderableModel->mesh->npoints * 3,
+                 renderableModel->mesh->tcoords,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(2, 3,
+                          GL_FLOAT, GL_FALSE,
+                          2 * sizeof(*renderableModel->mesh->tcoords), (GLvoid*)0);
+    glEnableVertexAttribArray(2);
   }
 }
 
@@ -51,6 +61,7 @@ void initRenderObject(RenderObject *renderableModel, par_shapes_mesh *shapeMesh)
   glGenBuffers(1, &renderableModel->VBO);
   glGenBuffers(1, &renderableModel->EBO);
   glGenBuffers(1, &renderableModel->VBNO);
+  glGenBuffers(1, &renderableModel->VBUVO);
 
   updateRenderObject(renderableModel);
 }

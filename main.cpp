@@ -16,11 +16,6 @@
 #include "ShaderObject.cpp"
 #include "Camera.cpp"
 
-
-
-
-
-
 #pragma warning(push)
 #pragma warning(disable:4100)
 static bool keys[1024];
@@ -89,6 +84,7 @@ int main()
     "#version 400 core\n"
     "out vec3 vertexNormal;"
     "out vec3 vertexPosition;"
+    "out vec3 vertexColor;"
 
     "layout (location = 0) in vec3 position;"
     "layout (location = 1) in vec3 normal;"
@@ -96,30 +92,31 @@ int main()
     "uniform mat4 model;"
     "uniform mat4 view;"
     "uniform mat4 projection;"
+    "uniform vec3 objectColor;"
 
     "void main()"
     "{"
     " gl_Position = projection * view * model * vec4(position.x, position.y, position.z, 1.f);"
     " vertexNormal = mat3(transpose(inverse(model))) * normal;"
     " vertexPosition = vec3(model * vec4(position, 1.f));"
+    " vertexColor = objectColor;"
     "}";
 
   GLchar* gPassFragmentShaderSource =
     "#version 400 core\n"
     "in vec3 vertexNormal;"
     "in vec3 vertexPosition;"
+    "in vec3 vertexColor;"
 
     "layout (location = 0) out vec3 gPosition;"
     "layout (location = 1) out vec3 gNormal;"
     "layout (location = 2) out vec3 gColor;"
 
-    "uniform vec3 objectColor;"
-
     "void main()"
     "{"
     " gPosition = vertexPosition;"
     " gNormal = normalize(vertexNormal);"
-    " gColor = objectColor;"
+    " gColor = vertexColor;"
     "}";
 
   GLchar* lPassVertexShaderSource =
@@ -158,8 +155,8 @@ int main()
 
     " vec3 viewDirection = normalize(viewPosition - vertexPosition);"
     " vec3 reflectDirection = reflect(-lightDirection, normal);"
-    " vec3 specular = 0.5f * pow(max(dot(viewDirection, reflectDirection), 0.f), 32) * lightColor;"
-
+    " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 64);"
+    " vec3 specular = 1.f * spec * lightColor;"
     "  fragmentColor = vec4((ambient + diffuse + specular) * objectColor, 1.f);"
     "}";
 
@@ -169,20 +166,20 @@ int main()
   compileShaderObject(&gPassShader);
   linkShaderObject(&gPassShader);
 
-  glUseProgram(gPassShader.shaderProgramID);
-  GLuint gPositionLocation = glGetUniformLocation(gPassShader.shaderProgramID, "gPosition");
-  glUniform1i(gPositionLocation, 0);
-  GLuint gNormalLocation = glGetUniformLocation(gPassShader.shaderProgramID, "gNormal");
-  glUniform1i(gNormalLocation, 1);
-  GLuint gColorLocation = glGetUniformLocation(gPassShader.shaderProgramID, "gNormal");
-  glUniform1i(gColorLocation, 1);
-
-
   ShaderObject lPassShader;
   lPassShader.vertexShaderSource = lPassVertexShaderSource;
   lPassShader.fragmentShaderSource = lPassFragmentShaderSource;
   compileShaderObject(&lPassShader);
   linkShaderObject(&lPassShader);
+
+  glUseProgram(lPassShader.shaderProgramID);
+  GLuint gPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gPosition");
+  glUniform1i(gPositionLocation, 0);
+  GLuint gNormalLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gNormal");
+  glUniform1i(gNormalLocation, 1);
+  GLuint gColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gColor");
+  glUniform1i(gColorLocation, 2);
+
 
   GLuint gBuffer;
   glGenFramebuffers(1, &gBuffer);
@@ -213,7 +210,7 @@ int main()
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D,
                          gColor, 0);
 
   GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
@@ -246,7 +243,7 @@ int main()
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
   Camera camera;
   initCamera(&camera, (GLfloat)width, (GLfloat)height);
