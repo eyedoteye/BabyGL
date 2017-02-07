@@ -20,10 +20,10 @@
 #include <time.h>
 static glm::vec2 gradients[4] =
 {
-  glm::normalize(glm::vec2( 1.f,  1.f)),
-  glm::normalize(glm::vec2( 1.f, -1.f)),
-  glm::normalize(glm::vec2(-1.f,  1.f)),
-  glm::normalize(glm::vec2(-1.f, -1.f))
+  glm::vec2( 1.f,  1.f),
+  glm::vec2( 1.f, -1.f),
+  glm::vec2(-1.f,  1.f),
+  glm::vec2(-1.f, -1.f)
 //  glm::normalize(glm::vec3( 0.f,  1.f,  1.f)),
 //  glm::normalize(glm::vec3( 0.f,  1.f, -1.f)),
 //  glm::normalize(glm::vec3( 0.f, -1.f,  1.f)),
@@ -38,7 +38,7 @@ float lerp(float v0, float v1, float t)
 {
   return (1.f - t) * v0 + t * v1;
 }
-#define TEXTURE_SIZE 128
+#define TEXTURE_SIZE 300
 static float gradientGrid[TEXTURE_SIZE][TEXTURE_SIZE][2];
 void initGradientGrid(int seed)
 {
@@ -64,7 +64,7 @@ void initCharPermutation(int seed)
     charPermutation[index] = (char)index;
   }
 
-#define ITERATIONS 100
+#define ITERATIONS 3000
   for(int iteration = 0; iteration < ITERATIONS; ++iteration)
   {
     char temp;
@@ -77,37 +77,54 @@ void initCharPermutation(int seed)
   }
 }
 
-float computePerlinInfluence(int ix, int iy, float x, float y)
+float computePerlinInfluence(int hash, float x, float y)
 {
-  float dx = x - ix;
-  float dy = y - iy;
+  switch(hash & 0x3)
+  {
+    case 0x0: return x + y;
+    case 0x1: return -x + y;
+    case 0x2: return x - y;
+    case 0x3: return -x - y;
+  }
+}
 
-  return dx * gradientGrid[iy][ix][0] + dy * gradientGrid[iy][ix][1];
+float fade(float t)
+{
+  return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
 float computePerlinNoise(float x, float y)
 {
-  int x0 = x > 0 ? (int)x : int(x) - 1;
-  int x1 = x0 + 1;
-  int y0 = y > 0 ? (int)y : int(y) - 1;
-  int y1 = y0 + 1;
+  int xi = (int)x & 255;
+  int yi = (int)y & 255;
 
-  float sx = x - x0;
-  float sy = y - y0;
+  float xf = x - (int)x;
+  float yf = y - (int)y;
 
-  float p0 = computePerlinInfluence(x0, y0, x, y);
-  float p1 = computePerlinInfluence(x1, y0, x, y);
-  float p2 = computePerlinInfluence(x0, y1, x, y);
-  float p3 = computePerlinInfluence(x1, y1, x, y);
+  float u = fade(xf);
+  float v = fade(yf);
 
-  return lerp(lerp(p0, p1, sx),
-              lerp(p2, p3, sx), sy);
+  int aa = charPermutation[charPermutation[xi] + yi];
+  int ab = charPermutation[charPermutation[xi] + (char)(yi + 1)];
+  int ba = charPermutation[charPermutation[(char)(xi + 1)] + yi];
+  int bb = charPermutation[charPermutation[(char)(xi + 1)] + char(yi + 1)];
+
+  float v1 = lerp(computePerlinInfluence(aa, xf, yf),
+                  computePerlinInfluence(ba, xf - 1, yf),
+                  u);
+  float v2 = lerp(computePerlinInfluence(ab, xf, yf - 1),
+                  computePerlinInfluence(bb, xf - 1, yf -1),
+                  u);
+
+  float vv = (lerp(v1, v2, v) + 1)/2;
+
+  return vv;
 }
+
+static float textureData[TEXTURE_SIZE][TEXTURE_SIZE][3];
 
 void generate2DPerlinNoise(GLuint textureID, int seed)
 {
-  float textureData[TEXTURE_SIZE][TEXTURE_SIZE][3];
-
   initGradientGrid(seed);
   initCharPermutation(seed);
 
@@ -115,9 +132,9 @@ void generate2DPerlinNoise(GLuint textureID, int seed)
   {
     for(int col = 0; col < TEXTURE_SIZE; ++col)
     {
-      textureData[row][col][0] = computePerlinNoise(col / 2.f, row / 2.f);
-      textureData[row][col][1] = textureData[row][col][0];
-      textureData[row][col][2] = textureData[row][col][0];
+      textureData[row][col][0] =
+      textureData[row][col][1] =
+      textureData[row][col][2] = computePerlinNoise(col/8.f, row/8.f);
     }
   }
 
@@ -385,10 +402,7 @@ int main()
     "void main()"
     "{"
     " vec3 color = texture2D(perlinNoise, textureCoords).rgb;"
-    " if(color.r < 1.f && color.r > 0.01f)"
-    "  fragmentColor = vec4(0.f,1.f,0.f,1.f);"
-    " else"
-    "  fragmentColor = vec4(color, 1.f);"
+    " fragmentColor = vec4(color, 1.f);"
     "}";
 
   ShaderObject textureTest;
