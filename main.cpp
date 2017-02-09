@@ -38,7 +38,7 @@ float lerp(float v0, float v1, float t)
 {
   return (1.f - t) * v0 + t * v1;
 }
-#define TEXTURE_SIZE 512
+#define TEXTURE_SIZE 128
 static float gradientGrid[TEXTURE_SIZE][TEXTURE_SIZE][2];
 void initGradientGrid(int seed)
 {
@@ -152,10 +152,13 @@ void generate2DPerlinNoise(GLuint textureID, int seed)
   glBindTexture(GL_TEXTURE_2D, textureID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, TEXTURE_SIZE, TEXTURE_SIZE, 0,
                GL_RGB, GL_FLOAT, (GLvoid*)textureData);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glGenerateMipmap(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -265,11 +268,11 @@ int main()
     "{"
     " gPosition = vertexPosition;"
     " vec3 proceduralNormal = texture2D(perlinNoise,"
-    "                                   textureCoords.xy).rgb;"
+    "                                   textureCoords.xy*(gPosition.x * gPosition.y * gPosition.z)).rgb;"
     " proceduralNormal = proceduralNormal * 2 - vec3(1);"
     //a more appealing way of doing this is needed.
-    //" gNormal = normalize(vertexNormal + proceduralNormal);"
-    " gNormal = vertexPosition;"
+    " gNormal = normalize(vertexNormal + proceduralNormal / 2);"
+    //" gNormal = vertexPosition;"
     " gColor = vertexColor;"
     "}";
 
