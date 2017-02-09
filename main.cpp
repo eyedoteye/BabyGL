@@ -38,7 +38,7 @@ float lerp(float v0, float v1, float t)
 {
   return (1.f - t) * v0 + t * v1;
 }
-#define TEXTURE_SIZE 300
+#define TEXTURE_SIZE 512
 static float gradientGrid[TEXTURE_SIZE][TEXTURE_SIZE][2];
 void initGradientGrid(int seed)
 {
@@ -85,6 +85,8 @@ float computePerlinInfluence(int hash, float x, float y)
     case 0x1: return -x + y;
     case 0x2: return x - y;
     case 0x3: return -x - y;
+#define THEOMEGAVARIABLE 3.14f
+    default: return THEOMEGAVARIABLE;
   }
 }
 
@@ -95,6 +97,15 @@ float fade(float t)
 
 float computePerlinNoise(float x, float y)
 {
+  while (x > 255)
+  {
+    x = x - 255;
+  }
+  while (y > 255)
+  {
+    y = y - 255;
+  }
+
   int xi = (int)x & 255;
   int yi = (int)y & 255;
 
@@ -104,10 +115,10 @@ float computePerlinNoise(float x, float y)
   float u = fade(xf);
   float v = fade(yf);
 
-  int aa = charPermutation[charPermutation[xi] + yi];
-  int ab = charPermutation[charPermutation[xi] + (char)(yi + 1)];
-  int ba = charPermutation[charPermutation[(char)(xi + 1)] + yi];
-  int bb = charPermutation[charPermutation[(char)(xi + 1)] + char(yi + 1)];
+  int aa = charPermutation[(charPermutation[xi] + yi) % 255];
+  int ab = charPermutation[(charPermutation[xi] + yi + 1) % 255];
+  int ba = charPermutation[(charPermutation[(xi + 1) % 255] + yi) % 255];
+  int bb = charPermutation[(charPermutation[(xi + 1) % 255] + yi + 1) % 255];
 
   float v1 = lerp(computePerlinInfluence(aa, xf, yf),
                   computePerlinInfluence(ba, xf - 1, yf),
@@ -134,7 +145,7 @@ void generate2DPerlinNoise(GLuint textureID, int seed)
     {
       textureData[row][col][0] =
       textureData[row][col][1] =
-      textureData[row][col][2] = computePerlinNoise(col/8.f, row/8.f);
+        textureData[row][col][2] = computePerlinNoise((float)col/2, (float)row/2);
     }
   }
 
@@ -143,6 +154,8 @@ void generate2DPerlinNoise(GLuint textureID, int seed)
                GL_RGB, GL_FLOAT, (GLvoid*)textureData);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -215,9 +228,11 @@ int main()
     "out vec3 vertexNormal;"
     "out vec3 vertexPosition;"
     "out vec3 vertexColor;"
+    "out vec2 textureCoords;"
 
     "layout (location = 0) in vec3 position;"
     "layout (location = 1) in vec3 normal;"
+    "layout (location = 2) in vec2 uvCoords;"
 
     "uniform mat4 model;"
     "uniform mat4 view;"
@@ -230,6 +245,7 @@ int main()
     " vertexNormal = mat3(transpose(inverse(model))) * normal;"
     " vertexPosition = vec3(model * vec4(position, 1.f));"
     " vertexColor = objectColor;"
+    " textureCoords = uvCoords;"
     "}";
 
   GLchar* gPassFragmentShaderSource =
@@ -237,15 +253,23 @@ int main()
     "in vec3 vertexNormal;"
     "in vec3 vertexPosition;"
     "in vec3 vertexColor;"
+    "in vec2 textureCoords;"
 
     "layout (location = 0) out vec3 gPosition;"
     "layout (location = 1) out vec3 gNormal;"
     "layout (location = 2) out vec3 gColor;"
 
+    "uniform sampler2D perlinNoise;"
+
     "void main()"
     "{"
     " gPosition = vertexPosition;"
-    " gNormal = normalize(vertexNormal);"
+    " vec3 proceduralNormal = texture2D(perlinNoise,"
+    "                                   textureCoords.xy).rgb;"
+    " proceduralNormal = proceduralNormal * 2 - vec3(1);"
+    //a more appealing way of doing this is needed.
+    //" gNormal = normalize(vertexNormal + proceduralNormal);"
+    " gNormal = vertexPosition;"
     " gColor = vertexColor;"
     "}";
 
@@ -272,6 +296,7 @@ int main()
     "uniform vec3 viewPosition;"
     "uniform vec3 lightPosition;"
     "uniform vec3 lightColor;"
+
     "void main()"
     "{"
     " vec3 objectColor = texture2D(gColor, textureCoords).rgb;"
@@ -293,11 +318,15 @@ int main()
     "  fragmentColor = vec4((ambient + diffuse + specular) * objectColor, 1.f);"
     "}";
 
-/*  ShaderObject gPassShader;
+  ShaderObject gPassShader;
   gPassShader.vertexShaderSource = gPassVertexShaderSource;
   gPassShader.fragmentShaderSource = gPassFragmentShaderSource;
   compileShaderObject(&gPassShader);
   linkShaderObject(&gPassShader);
+
+  glUseProgram(gPassShader.shaderProgramID);
+  GLuint perlinNoiseLocation = glGetUniformLocation(gPassShader.shaderProgramID, "perlinNoise");
+  glUniform1i(perlinNoiseLocation, 0);
 
   ShaderObject lPassShader;
   lPassShader.vertexShaderSource = lPassVertexShaderSource;
@@ -312,7 +341,6 @@ int main()
   glUniform1i(gNormalLocation, 1);
   GLuint gColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gColor");
   glUniform1i(gColorLocation, 2);
-
 
   GLuint gBuffer;
   glGenFramebuffers(1, &gBuffer);
@@ -357,7 +385,7 @@ int main()
                             GL_RENDERBUFFER, rboDepth);
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     printf("Framebuffer is broken!");
-*/
+
 
   GLuint quadVAO;
   GLuint quadVBO;
@@ -378,7 +406,7 @@ int main()
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
-
+/*
   GLchar* textureTestVertexShader =
     "#version 400 core\n"
     "out vec2 textureCoords;"
@@ -414,7 +442,7 @@ int main()
   glUseProgram(textureTest.shaderProgramID);
   GLuint perlinNoiseLocation = glGetUniformLocation(textureTest.shaderProgramID, "perlinNoise");
   glUniform1i(perlinNoiseLocation, 0);
-
+*/
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
   generate2DPerlinNoise(perlinNoiseTextureID, 420);
@@ -426,11 +454,13 @@ int main()
   glm::vec3 lightColor = glm::vec3(1.f);
 
   RenderObject shape;
-  initRenderObject(&shape, par_shapes_create_cube());
+  initRenderObject(&shape,
+                   par_shapes_create_parametric_sphere(32, 32));
   shape.model = glm::translate(shape.model, glm::vec3(0.f, 0.f, 0.f));
 
   RenderObject shape2;
-  initRenderObject(&shape2, par_shapes_create_tetrahedron());
+  initRenderObject(&shape2,
+                   par_shapes_create_parametric_sphere(16,16));
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
 
@@ -462,16 +492,18 @@ int main()
     mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
-#define ROTATION_SPEED 1.f
+#define ROTATION_SPEED .2f
     shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, -5.f));
 
-/*    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(gPassShader.shaderProgramID);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
 
     GLint projectionLocation = glGetUniformLocation(gPassShader.shaderProgramID, "projection");
     glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(camera.projection));
@@ -480,13 +512,16 @@ int main()
 
     drawRenderObject(&shape2, gPassShader.shaderProgramID);
     drawRenderObject(&shape, gPassShader.shaderProgramID);
-*/
+/*
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(textureTest.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
-/*
+*/
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(lPassShader.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, gPosition);
@@ -501,7 +536,7 @@ int main()
     glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
     GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "lightColor");
     glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
-*/
+
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
