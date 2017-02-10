@@ -300,6 +300,9 @@ int main()
     "uniform vec3 lightPosition;"
     "uniform vec3 lightColor;"
 
+    "uniform float diffuseImpact;"
+    "uniform float specularImpact;"
+
     "void main()"
     "{"
     " vec3 objectColor = texture2D(gColor, textureCoords).rgb;"
@@ -309,12 +312,12 @@ int main()
     " vec3 normal = texture2D(gNormal, textureCoords).rgb;"
     " vec3 vertexPosition = texture2D(gPosition, textureCoords).rgb;"
     " vec3 lightDirection = normalize(lightPosition - vertexPosition);"
-    " vec3 diffuse = max(dot(normal, lightDirection), 0.f) * lightColor;"
+    " vec3 diffuse = diffuseImpact * max(dot(normal, lightDirection), 0.f) * lightColor;"
 
     " vec3 viewDirection = normalize(viewPosition - vertexPosition);"
     " vec3 reflectDirection = reflect(-lightDirection, normal);"
     " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 64);"
-    " vec3 specular = 1.f * spec * lightColor;"
+    " vec3 specular = specularImpact * spec * lightColor;"
     " if(normal == vec3(0.f))"
     "  fragmentColor = vec4(.4f, .6f, .2f, 1.f);"
     " else"
@@ -409,43 +412,6 @@ int main()
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
-/*
-  GLchar* textureTestVertexShader =
-    "#version 400 core\n"
-    "out vec2 textureCoords;"
-
-    "layout (location = 0) in vec3 position;"
-    "layout (location = 1) in vec2 tCoords;"
-
-    "void main()"
-    "{"
-    " textureCoords = tCoords;"
-    " gl_Position = vec4(position, 1.f);"
-    "}";
-
-  GLchar* textureTestFragmentShader =
-    "#version 400 core\n"
-    "out vec4 fragmentColor;"
-    "in vec2 textureCoords;"
-
-    "uniform sampler2D perlinNoise;"
-
-    "void main()"
-    "{"
-    " vec3 color = texture2D(perlinNoise, textureCoords).rgb;"
-    " fragmentColor = vec4(color, 1.f);"
-    "}";
-
-  ShaderObject textureTest;
-  textureTest.vertexShaderSource = textureTestVertexShader;
-  textureTest.fragmentShaderSource = textureTestFragmentShader;
-  compileShaderObject(&textureTest);
-  linkShaderObject(&textureTest);
-
-  glUseProgram(textureTest.shaderProgramID);
-  GLuint perlinNoiseLocation = glGetUniformLocation(textureTest.shaderProgramID, "perlinNoise");
-  glUniform1i(perlinNoiseLocation, 0);
-*/
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
   generate2DPerlinNoise(perlinNoiseTextureID, 420);
@@ -463,9 +429,12 @@ int main()
 
   RenderObject shape2;
   initRenderObject(&shape2,
-                   par_shapes_create_parametric_sphere(16,16));
+                   par_shapes_create_parametric_sphere(32,32));
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
+
+  float specularImpact = 0;
+  float diffuseImpact = 0;
 
   GLfloat mouseCoordsAtLastFrameStart[2];
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
@@ -495,6 +464,27 @@ int main()
     mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
+#define SLIDERSPEED 25
+    if(keys[GLFW_KEY_3])
+      specularImpact -= SLIDERSPEED * dT;
+    if(keys[GLFW_KEY_4])
+      specularImpact += SLIDERSPEED * dT;
+
+    if(keys[GLFW_KEY_1])
+      diffuseImpact -= SLIDERSPEED * dT;
+    if(keys[GLFW_KEY_2])
+      diffuseImpact += SLIDERSPEED * dT;
+
+    if(diffuseImpact < 0)
+      diffuseImpact = 0;
+    if(diffuseImpact > 255)
+      diffuseImpact = 255;
+
+    if(specularImpact < 0)
+      specularImpact = 0;
+    if(specularImpact > 255)
+      specularImpact = 255;
+
 #define ROTATION_SPEED .2f
     shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
@@ -515,13 +505,6 @@ int main()
 
     drawRenderObject(&shape2, gPassShader.shaderProgramID);
     drawRenderObject(&shape, gPassShader.shaderProgramID);
-/*
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glUseProgram(textureTest.shaderProgramID);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
-*/
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -539,6 +522,11 @@ int main()
     glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
     GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "lightColor");
     glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
+
+    GLint diffuseImpactLocation = glGetUniformLocation(lPassShader.shaderProgramID, "diffuseImpact");
+    glUniform1f(diffuseImpactLocation, diffuseImpact / 255.f);
+    GLint specularImpactLocation = glGetUniformLocation(lPassShader.shaderProgramID, "specularImpact");
+    glUniform1f(specularImpactLocation, specularImpact / 255.f);
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
