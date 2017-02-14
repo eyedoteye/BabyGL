@@ -310,23 +310,27 @@ int main()
 
   GLchar* guiGeometryShaderSource =
     "#version 400 core\n"
+
     "layout (points) in;"
-    "layout (triangle_strip, max_vertices = 4) out;"
-    "void buildSquare(vec4 position)"
+    "layout (triangle_strip, max_vertices = 12) out;"
+
+    "void buildSquare(vec4 position, float width, float height)"
     "{"
-    " gl_Position = position + vec4(0.f, 0.f, 0.f, 0.f);"
+    " gl_Position = position;"
     " EmitVertex();"
-    " gl_Position = position + vec4(0.2f, 0.f, 0.f, 0.f);"
+    " gl_Position = position + vec4(width, 0.f, 0.f, 0.f);"
     " EmitVertex();"
-    " gl_Position = position + vec4(0.f, -0.2f, 0.f, 0.f);"
+    " gl_Position = position + vec4(0.f, -height, 0.f, 0.f);"
     " EmitVertex();"
-    " gl_Position = position + vec4(0.2f, -0.2f, 0.f, 0.f);"
+    " gl_Position = position + vec4(width, -height, 0.f, 0.f);"
     " EmitVertex();"
     " EndPrimitive();"
     "}"
     "void main()"
     "{"
-    " buildSquare(gl_in[0].gl_Position);"
+    " buildSquare(gl_in[0].gl_Position, 0.2f, 0.05f);"
+    " buildSquare(gl_in[0].gl_Position + vec4(0.21f, vec3(0.f)), 0.02f, 0.05f);"
+    " buildSquare(gl_in[0].gl_Position + vec4(0.24f, vec3(0.f)), 0.2f, 0.05f);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -334,7 +338,7 @@ int main()
     "out vec4 fragmentColor;"
     "void main()"
     "{"
-    " fragmentColor = vec4(0.0f, 1.0f, 0.0f, 1.0f);"
+    " fragmentColor = vec4(1.f);"
     "}";
 
   ShaderObject gPassShader = {};
