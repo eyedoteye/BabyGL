@@ -1,10 +1,12 @@
 struct ShaderObject
 {
   GLuint vertexShaderID;
+  GLuint geometryShaderID;
   GLuint fragmentShaderID;
   GLuint shaderProgramID;
 
   char* vertexShaderSource;
+  char* geometryShaderSource;
   char* fragmentShaderSource;
 };
 
@@ -21,9 +23,9 @@ void compileShaderObject(ShaderObject* shaderObject)
   glCompileShader(shaderObject->vertexShaderID);
   glCompileShader(shaderObject->fragmentShaderID);
 
+  GLint success;
+  GLchar infoLog[512];
   {
-    GLint success;
-    GLchar infoLog[512];
     glGetShaderiv(shaderObject->fragmentShaderID, GL_COMPILE_STATUS, &success);
     if(!success)
     {
@@ -38,6 +40,23 @@ void compileShaderObject(ShaderObject* shaderObject)
       printf("Vertex Shader Compilation Failure: %s", infoLog);
     }
   }
+
+  if(shaderObject->geometryShaderSource != NULL)
+  {
+    shaderObject->geometryShaderID = glCreateShader(GL_GEOMETRY_SHADER);
+    glShaderSource(shaderObject->geometryShaderID, 1,
+                   &shaderObject->geometryShaderSource, NULL);
+    glCompileShader(shaderObject->geometryShaderID);
+
+    {
+      glGetShaderiv(shaderObject->geometryShaderID, GL_COMPILE_STATUS, &success);
+      if(!success)
+      {
+        glGetShaderInfoLog(shaderObject->geometryShaderID, 512, NULL, infoLog);
+        printf("Geometry Shader Compilation Failure: %s", infoLog);
+      }
+    }
+  }
 }
 
 void linkShaderObject(ShaderObject* shaderObject)
@@ -47,6 +66,11 @@ void linkShaderObject(ShaderObject* shaderObject)
                  shaderObject->vertexShaderID);
   glAttachShader(shaderObject->shaderProgramID,
                  shaderObject->fragmentShaderID);
+  if(shaderObject->geometryShaderSource != NULL)
+  {
+    glAttachShader(shaderObject->shaderProgramID,
+                   shaderObject->geometryShaderID);
+  }
   glLinkProgram(shaderObject->shaderProgramID);
 
   {
