@@ -18,42 +18,18 @@
 
 #include <stdlib.h>
 #include <time.h>
-static glm::vec2 gradients[4] =
-{
-  glm::vec2( 1.f,  1.f),
-  glm::vec2( 1.f, -1.f),
-  glm::vec2(-1.f,  1.f),
-  glm::vec2(-1.f, -1.f)
-//  glm::normalize(glm::vec3( 0.f,  1.f,  1.f)),
-//  glm::normalize(glm::vec3( 0.f,  1.f, -1.f)),
-//  glm::normalize(glm::vec3( 0.f, -1.f,  1.f)),
-//  glm::normalize(glm::vec3( 0.f, -1.f, -1.f)),
-//  glm::normalize(glm::vec3( 1.f,  0.f,  1.f)),
-//  glm::normalize(glm::vec3( 1.f,  0.f, -1.f)),
-//  glm::normalize(glm::vec3(-1.f,  0.f,  1.f)),
-//  glm::normalize(glm::vec3(-1.f,  0.f, -1.f))
-};
+
+//ToDo:
+// Sliders
+//   Draw Rectangle
+//   Draw Text!?!
+// Draw Alpha Blended, Scaled Quad
 
 float lerp(float v0, float v1, float t)
 {
   return (1.f - t) * v0 + t * v1;
 }
 #define TEXTURE_SIZE 128
-static float gradientGrid[TEXTURE_SIZE][TEXTURE_SIZE][2];
-void initGradientGrid(int seed)
-{
-  srand(seed);
-  for(int x = 0; x < TEXTURE_SIZE; ++x)
-  {
-    for(int y = 0; y < TEXTURE_SIZE; ++y)
-    {
-      int gradientIndex = rand() % 4;
-      glm::vec2* gradient = &gradients[gradientIndex];
-      gradientGrid[x][y][0] = gradient->x;
-      gradientGrid[x][y][1] = gradient->y;
-    }
-  }
-}
 
 static char charPermutation[255];
 void initCharPermutation(int seed)
@@ -136,7 +112,6 @@ static float textureData[TEXTURE_SIZE][TEXTURE_SIZE][3];
 
 void generate2DPerlinNoise(GLuint textureID, int seed)
 {
-  initGradientGrid(seed);
   initCharPermutation(seed);
 
   for(int row = 0; row < TEXTURE_SIZE; ++row)
@@ -290,6 +265,7 @@ int main()
     "}";
 
   GLchar* lPassFragmentShaderSource =
+    "#version 400 core\n"
     "out vec4 fragmentColor;"
     "in vec2 textureCoords;"
 
@@ -324,7 +300,44 @@ int main()
     "  fragmentColor = vec4((ambient + diffuse + specular) * objectColor, 1.f);"
     "}";
 
-  ShaderObject gPassShader;
+  GLchar* guiVertexShaderSource =
+    "#version 400 core\n"
+    "layout (location = 0) in vec2 position;"
+    "void main()"
+    "{"
+    " gl_Position = vec4(position.x, position.y, 0.0f, 1.0f);"
+    "}";
+
+  GLchar* guiGeometryShaderSource =
+    "#version 400 core\n"
+    "layout (points) in;"
+    "layout (triangle_strip, max_vertices = 4) out;"
+    "void buildSquare(vec4 position)"
+    "{"
+    " gl_Position = position + vec4(0.f, 0.f, 0.f, 0.f);"
+    " EmitVertex();"
+    " gl_Position = position + vec4(0.2f, 0.f, 0.f, 0.f);"
+    " EmitVertex();"
+    " gl_Position = position + vec4(0.f, -0.2f, 0.f, 0.f);"
+    " EmitVertex();"
+    " gl_Position = position + vec4(0.2f, -0.2f, 0.f, 0.f);"
+    " EmitVertex();"
+    " EndPrimitive();"
+    "}"
+    "void main()"
+    "{"
+    " buildSquare(gl_in[0].gl_Position);"
+    "}";
+
+  GLchar* guiFragmentShaderSource =
+    "#version 400 core\n"
+    "out vec4 fragmentColor;"
+    "void main()"
+    "{"
+    " fragmentColor = vec4(0.0f, 1.0f, 0.0f, 1.0f);"
+    "}";
+
+  ShaderObject gPassShader = {};
   gPassShader.vertexShaderSource = gPassVertexShaderSource;
   gPassShader.fragmentShaderSource = gPassFragmentShaderSource;
   compileShaderObject(&gPassShader);
@@ -334,7 +347,7 @@ int main()
   GLuint perlinNoiseLocation = glGetUniformLocation(gPassShader.shaderProgramID, "perlinNoise");
   glUniform1i(perlinNoiseLocation, 0);
 
-  ShaderObject lPassShader;
+  ShaderObject lPassShader = {};
   lPassShader.vertexShaderSource = lPassVertexShaderSource;
   lPassShader.fragmentShaderSource = lPassFragmentShaderSource;
   compileShaderObject(&lPassShader);
@@ -347,6 +360,13 @@ int main()
   glUniform1i(gNormalLocation, 1);
   GLuint gColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gColor");
   glUniform1i(gColorLocation, 2);
+
+  ShaderObject guiShader = {};
+  guiShader.vertexShaderSource = guiVertexShaderSource;
+  guiShader.geometryShaderSource = guiGeometryShaderSource;
+  guiShader.fragmentShaderSource = guiFragmentShaderSource;
+  compileShaderObject(&guiShader);
+  linkShaderObject(&guiShader);
 
   GLuint gBuffer;
   glGenFramebuffers(1, &gBuffer);
@@ -391,7 +411,6 @@ int main()
                             GL_RENDERBUFFER, rboDepth);
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     printf("Framebuffer is broken!");
-
 
   GLuint quadVAO;
   GLuint quadVBO;
@@ -530,6 +549,13 @@ int main()
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glUseProgram(guiShader.shaderProgramID);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_POINTS, 0, 4);
     glBindVertexArray(0);
 
     GLenum err;
