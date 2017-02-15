@@ -25,6 +25,48 @@
 //   Draw Text!?!
 // Draw Alpha Blended, Scaled Quad
 
+struct SliderGUI{
+  GLuint VAO;
+  GLuint vboPositions, vboTs;
+
+  int count;
+  float* positions;
+  float* ts;
+};
+
+void initSliderGUI(SliderGUI *sliderGUI, float* positions, float* ts, int count)
+{
+  glGenVertexArrays(1, &sliderGUI->VAO);
+  glGenBuffers(1, &sliderGUI->vboPositions);
+  glGenBuffers(1, &sliderGUI->vboTs);
+
+  sliderGUI->positions = positions;
+  sliderGUI->ts = ts;
+
+  glBindVertexArray(sliderGUI->VAO);
+  {
+    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboPositions);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * count * 2,
+                 positions,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(float) * 2,
+                          (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER,  sliderGUI->vboTs);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * count,
+                 ts,
+                 GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE,
+                          sizeof(float),
+                          (GLvoid*)0);
+    glEnableVertexAttribArray(1);
+  }
+}
+
 float lerp(float v0, float v1, float t)
 {
   return (1.f - t) * v0 + t * v1;
@@ -302,14 +344,26 @@ int main()
 
   GLchar* guiVertexShaderSource =
     "#version 400 core\n"
+    "out VS_OUT"
+    "{"
+    " float t;"
+    "} vs_out;"
+
     "layout (location = 0) in vec2 position;"
+    "layout (location = 1) in float t;"
+
     "void main()"
     "{"
     " gl_Position = vec4(position.x, position.y, 0.0f, 1.0f);"
+    " vs_out.t = t;"
     "}";
 
   GLchar* guiGeometryShaderSource =
     "#version 400 core\n"
+    "in VS_OUT"
+    "{"
+    " float t;"
+    "} gs_in[];"
 
     "layout (points) in;"
     "layout (triangle_strip, max_vertices = 12) out;"
@@ -328,9 +382,10 @@ int main()
     "}"
     "void main()"
     "{"
-    " buildSquare(gl_in[0].gl_Position, 0.2f, 0.05f);"
-    " buildSquare(gl_in[0].gl_Position + vec4(0.21f, vec3(0.f)), 0.02f, 0.05f);"
-    " buildSquare(gl_in[0].gl_Position + vec4(0.24f, vec3(0.f)), 0.2f, 0.05f);"
+    " float t = gs_in[0].t * .96f;"
+    " buildSquare(gl_in[0].gl_Position, t, 0.05f);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), 0.02f, 0.05f);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.04f, vec3(0.f)), 1.f - t - 0.04f, 0.05f);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -434,6 +489,18 @@ int main()
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+
+  float sliderPositions[] = {
+    -1.f, 1.f,
+    -1.f, .8f
+  };
+
+  float sliderTs[] = {
+    .5f, .3f
+  };
+
+  SliderGUI sliderGUI = {};
+  initSliderGUI(&sliderGUI, sliderPositions, sliderTs, 2);
 
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
@@ -558,8 +625,15 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(guiShader.shaderProgramID);
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_POINTS, 0, 4);
+    sliderTs[0] = diffuseImpact / 255.f;
+    sliderTs[1] = specularImpact / 255.f;
+    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(float) * 2,
+                 sliderTs,
+                 GL_DYNAMIC_DRAW);
+    glBindVertexArray(sliderGUI.VAO);
+    glDrawArrays(GL_POINTS, 0, 2);
     glBindVertexArray(0);
 
     GLenum err;
