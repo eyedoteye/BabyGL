@@ -47,23 +47,31 @@ void initSliderGUI(SliderGUI *sliderGUI, float* positions, float* ts, int count)
   {
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboPositions);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * count * 2,
+                 sizeof(float) * count * 5,
                  positions,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(float) * 2,
+                          sizeof(float) * 5,
                           (GLvoid*)0);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(float) * 5,
+                          (GLvoid*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE,
+                          sizeof(float) * 5,
+                          (GLvoid*)(4 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER,  sliderGUI->vboTs);
     glBufferData(GL_ARRAY_BUFFER,
                  sizeof(float) * count,
                  ts,
                  GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE,
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
                           sizeof(float),
                           (GLvoid*)0);
-    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(3);
   }
 }
 
@@ -350,15 +358,21 @@ int main()
     "out VS_OUT"
     "{"
     " float t;"
+    " float barWidth;"
+    " vec2 dimensions;"
     "} vs_out;"
 
     "layout (location = 0) in vec2 position;"
-    "layout (location = 1) in float t;"
+    "layout (location = 1) in vec2 dimensions;"
+    "layout (location = 2) in float barWidth;"
+    "layout (location = 3) in float t;"
 
     "void main()"
     "{"
     " gl_Position = vec4(position.x, position.y, 0.0f, 1.0f);"
     " vs_out.t = t;"
+    " vs_out.dimensions = dimensions;"
+    " vs_out.barWidth = barWidth;"
     "}";
 
   GLchar* guiGeometryShaderSource =
@@ -366,6 +380,8 @@ int main()
     "in VS_OUT"
     "{"
     " float t;"
+    " float barWidth;"
+    " vec2 dimensions;"
     "} gs_in[];"
 
     "layout (points) in;"
@@ -385,10 +401,12 @@ int main()
     "}"
     "void main()"
     "{"
+    " float width = gs_in[0].dimensions.x;"
     " float t = gs_in[0].t * .96f;"
-    " buildSquare(gl_in[0].gl_Position, t, 0.05f);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), 0.02f, 0.05f);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.04f, vec3(0.f)), 1.f - t - 0.04f, 0.05f);"
+    " float height = gs_in[0].dimensions.y;"
+    " buildSquare(gl_in[0].gl_Position, t, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), 0.02f, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.04f, vec3(0.f)), 1.f - t - 0.04f, height);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -494,9 +512,14 @@ int main()
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
 #define P2F(X, DIM) ((X)/(float)(DIM)) * 2.f - 1.f
-  float sliderPositions[] = {
+  float sliderStaticInfo[] = {
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT, SCREEN_HEIGHT),
-    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 20, SCREEN_HEIGHT)
+    P2F(5, SCREEN_WIDTH), 5.f / SCREEN_HEIGHT * 2,
+    P2F(5, SCREEN_WIDTH),
+
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 6, SCREEN_HEIGHT),
+    P2F(5, SCREEN_WIDTH), 5.f / SCREEN_HEIGHT * 2,
+    P2F(5, SCREEN_WIDTH)
   };
 
   float sliderTs[] = {
@@ -504,7 +527,7 @@ int main()
   };
 
   SliderGUI sliderGUI = {};
-  initSliderGUI(&sliderGUI, sliderPositions, sliderTs, 2);
+  initSliderGUI(&sliderGUI, sliderStaticInfo, sliderTs, 2);
 
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
