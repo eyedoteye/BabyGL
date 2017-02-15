@@ -207,6 +207,9 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 }
 #pragma warning(pop)
 
+
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 int main()
 {
   glfwInit();
@@ -215,7 +218,7 @@ int main()
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(640,480, "Duckbut", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut", NULL, NULL);
   if(!window)
   {
     printf("GLFW window creation failure.\n");
@@ -490,9 +493,10 @@ int main()
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
+#define P2F(X, DIM) ((X)/(float)(DIM)) * 2.f - 1.f
   float sliderPositions[] = {
-    -1.f, 1.f,
-    -1.f, .8f
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT, SCREEN_HEIGHT),
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 20, SCREEN_HEIGHT)
   };
 
   float sliderTs[] = {
@@ -625,6 +629,7 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(guiShader.shaderProgramID);
+
     sliderTs[0] = diffuseImpact / 255.f;
     sliderTs[1] = specularImpact / 255.f;
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
