@@ -387,6 +387,8 @@ int main()
     "layout (points) in;"
     "layout (triangle_strip, max_vertices = 12) out;"
 
+    "uniform float onePixel;"
+
     "void buildSquare(vec4 position, float width, float height)"
     "{"
     " gl_Position = position;"
@@ -403,11 +405,11 @@ int main()
     "{"
     " float width = gs_in[0].dimensions.x;"
     " float barWidth = gs_in[0].barWidth;"
-    " float t = gs_in[0].t * (width - barWidth - .02f);"
+    " float t = gs_in[0].t * (width - barWidth - onePixel * 2);"
     " float height = gs_in[0].dimensions.y;"
     " buildSquare(gl_in[0].gl_Position, t, height);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), barWidth, height);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.02f + barWidth, vec3(0.f)), width - t - 0.02f, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + onePixel, vec3(0.f)), barWidth, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + onePixel * 2 + barWidth, vec3(0.f)), width - t - onePixel * 2, height);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -654,6 +656,9 @@ int main()
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(guiShader.shaderProgramID);
 
+    GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
+    glUniform1f(onePixelLocation, 1.f / SCREEN_WIDTH * 2);
+
     sliderTs[0] = diffuseImpact / 255.f;
     sliderTs[1] = specularImpact / 255.f;
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
@@ -661,6 +666,7 @@ int main()
                  sizeof(float) * 2,
                  sliderTs,
                  GL_DYNAMIC_DRAW);
+
     glBindVertexArray(sliderGUI.VAO);
     glDrawArrays(GL_POINTS, 0, 2);
     glBindVertexArray(0);
