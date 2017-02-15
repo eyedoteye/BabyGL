@@ -402,11 +402,12 @@ int main()
     "void main()"
     "{"
     " float width = gs_in[0].dimensions.x;"
-    " float t = gs_in[0].t * .96f;"
+    " float barWidth = gs_in[0].barWidth;"
+    " float t = gs_in[0].t * (width - barWidth - .02f);"
     " float height = gs_in[0].dimensions.y;"
     " buildSquare(gl_in[0].gl_Position, t, height);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), 0.02f, height);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.04f, vec3(0.f)), 1.f - t - 0.04f, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.01f, vec3(0.f)), barWidth, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + 0.02f + barWidth, vec3(0.f)), width - t - 0.02f, height);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -514,12 +515,12 @@ int main()
 #define P2F(X, DIM) ((X)/(float)(DIM)) * 2.f - 1.f
   float sliderStaticInfo[] = {
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT, SCREEN_HEIGHT),
-    P2F(5, SCREEN_WIDTH), 5.f / SCREEN_HEIGHT * 2,
-    P2F(5, SCREEN_WIDTH),
+    200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
+    5.f / SCREEN_WIDTH * 2,
 
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 6, SCREEN_HEIGHT),
-    P2F(5, SCREEN_WIDTH), 5.f / SCREEN_HEIGHT * 2,
-    P2F(5, SCREEN_WIDTH)
+    200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
+    5.f / SCREEN_WIDTH * 2
   };
 
   float sliderTs[] = {
