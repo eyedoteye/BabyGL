@@ -409,7 +409,7 @@ int main()
     " float height = gs_in[0].dimensions.y;"
     " buildSquare(gl_in[0].gl_Position, t, height);"
     " buildSquare(gl_in[0].gl_Position + vec4(t + onePixel, vec3(0.f)), barWidth, height);"
-    " buildSquare(gl_in[0].gl_Position + vec4(t + onePixel * 2 + barWidth, vec3(0.f)), width - t - onePixel * 2, height);"
+    " buildSquare(gl_in[0].gl_Position + vec4(t + onePixel * 2 + barWidth, vec3(0.f)), width - t - onePixel * 2 - barWidth, height);"
     "}";
 
   GLchar* guiFragmentShaderSource =
@@ -522,7 +522,7 @@ int main()
 
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 6, SCREEN_HEIGHT),
     200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
-    5.f / SCREEN_WIDTH * 2
+    20.f / SCREEN_WIDTH * 2
   };
 
   float sliderTs[] = {
