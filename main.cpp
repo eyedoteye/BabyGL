@@ -19,16 +19,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-glm::vec3 lightPosition = glm::vec3(0.f, 5.f, -2.f);
-glm::vec3 lightColor = glm::vec3(1.f);
-
-float ambientIntensity = 0;
-float specularIntensity = 0;
-float diffuseIntensity = 0;
-
-float linearAttenuation = 0;
-float quadraticAttenuation = 0;
-
 struct PointLight
 {
   glm::vec3 position;
@@ -603,7 +593,13 @@ int main()
 
   PointLight pointLights[1] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
-  pointLights[0].color = glm::vec3(1.f);
+  pointLights[0].color = glm::vec3(1.f,0.f,0.f);
+  RenderObject lightShape;
+  initRenderObject(&lightShape,
+                   par_shapes_create_cube());
+  lightShape.model = glm::translate(lightShape.model,
+                                    pointLights[0].position);
+  lightShape.color = pointLights[0].color;
 
   RenderObject shape;
   initRenderObject(&shape,
@@ -688,6 +684,7 @@ int main()
 
     drawRenderObject(&shape2, gPassShader.shaderProgramID);
     drawRenderObject(&shape, gPassShader.shaderProgramID);
+    drawRenderObject(&lightShape, gPassShader.shaderProgramID);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -704,9 +701,9 @@ int main()
 
 
     GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
-    glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
+    glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
     GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
-    glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
+    glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
 
     GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
     glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
