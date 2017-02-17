@@ -19,13 +19,35 @@
 #include <stdlib.h>
 #include <time.h>
 
-//ToDo:
-// Sliders
-//   Draw Rectangle
-//   Draw Text!?!
-// Draw Alpha Blended, Scaled Quad
+glm::vec3 lightPosition = glm::vec3(0.f, 5.f, -2.f);
+glm::vec3 lightColor = glm::vec3(1.f);
 
-struct SliderGUI{
+float ambientIntensity = 0;
+float specularIntensity = 0;
+float diffuseIntensity = 0;
+
+float linearAttenuation = 0;
+float quadraticAttenuation = 0;
+
+struct PointLight
+{
+  glm::vec3 position;
+  glm::vec3 color;
+  struct
+  {
+    float ambient;
+    float diffuse;
+    float specular;
+  } intensity;
+  struct
+  {
+    float linear;
+    float quadratic;
+  } attenuation;
+};
+
+struct SliderGUI
+{
   GLuint VAO;
   GLuint vboPositions, vboTs;
 
@@ -579,8 +601,9 @@ int main()
   Camera camera;
   initCamera(&camera, (GLfloat)width, (GLfloat)height);
 
-  glm::vec3 lightPosition = glm::vec3(0.f, 5.f, -2.f);
-  glm::vec3 lightColor = glm::vec3(1.f);
+  PointLight pointLights[1] = {};
+  pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
+  pointLights[0].color = glm::vec3(1.f);
 
   RenderObject shape;
   initRenderObject(&shape,
@@ -593,14 +616,7 @@ int main()
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
 
-  float ambientIntensity = 0;
-  float specularIntensity = 0;
-  float diffuseIntensity = 0;
-
-  float linearAttenuation = 0;
-  float quadraticAttenuation = 0;
-
-  float* currentSlider = &ambientIntensity;
+  float* currentSlider = &pointLights[0].intensity.ambient;
 
   GLfloat mouseCoordsAtLastFrameStart[2];
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
@@ -632,15 +648,15 @@ int main()
 
 #define SLIDERSPEED 25
     if(keys[GLFW_KEY_1])
-      currentSlider = &ambientIntensity;
+      currentSlider = &pointLights[0].intensity.ambient;
     else if(keys[GLFW_KEY_2])
-      currentSlider = &diffuseIntensity;
+      currentSlider = &pointLights[0].intensity.diffuse;
     else if(keys[GLFW_KEY_3])
-      currentSlider = &specularIntensity;
+      currentSlider = &pointLights[0].intensity.specular;
     else if(keys[GLFW_KEY_4])
-      currentSlider = &linearAttenuation;
+      currentSlider = &pointLights[0].attenuation.linear;
     else if(keys[GLFW_KEY_5])
-      currentSlider = &quadraticAttenuation;
+      currentSlider = &pointLights[0].attenuation.quadratic;
 
     if(keys[GLFW_KEY_Q])
       *currentSlider -= SLIDERSPEED * dT;
@@ -693,16 +709,16 @@ int main()
     glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
 
     GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
-    glUniform1f(ambientIntensityLocation, ambientIntensity / 255.f);
+    glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
     GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
-    glUniform1f(diffuseIntensityLocation, diffuseIntensity / 255.f);
+    glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
     GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
-    glUniform1f(specularIntensityLocation, specularIntensity / 255.f);
+    glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
 
     GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
-    glUniform1f(linearAttenuationLocation, linearAttenuation / 255.f);
+    glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
     GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
-    glUniform1f(quadraticAttenuationLocation, quadraticAttenuation / 255.f);
+    glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -715,11 +731,11 @@ int main()
     GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
     glUniform1f(onePixelLocation, 1.f / SCREEN_WIDTH * 2);
 
-    sliderTs[0] = ambientIntensity / 255.f;
-    sliderTs[1] = diffuseIntensity / 255.f;
-    sliderTs[2] = specularIntensity / 255.f;
-    sliderTs[3] = linearAttenuation / 255.f;
-    sliderTs[4] = quadraticAttenuation / 255.f;
+    sliderTs[0] = pointLights[0].intensity.ambient / 255.f;
+    sliderTs[1] = pointLights[0].intensity.diffuse / 255.f;
+    sliderTs[2] = pointLights[0].intensity.specular / 255.f;
+    sliderTs[3] = pointLights[0].attenuation.linear / 255.f;
+    sliderTs[4] = pointLights[0].attenuation.quadratic / 255.f;
 
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
     glBufferData(GL_ARRAY_BUFFER,
