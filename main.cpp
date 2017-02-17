@@ -319,6 +319,21 @@ int main()
 
   GLchar* lPassFragmentShaderSource =
     "#version 400 core\n"
+
+    "#define MAX_POINT_LIGHTS 1\n"
+    "struct PointLight"
+    "{"
+    " vec3 color;"
+    " vec3 position;"
+
+    " float attenuationLinear;"
+    " float attenuationQuadratic;"
+
+    " float intensityAmbient;"
+    " float intensityDiffuse;"
+    " float intensitySpecular;"
+    "};"
+
     "out vec4 fragmentColor;"
     "in vec2 textureCoords;"
 
@@ -326,31 +341,45 @@ int main()
     "uniform sampler2D gNormal;"
     "uniform sampler2D gColor;"
     "uniform vec3 viewPosition;"
-    "uniform vec3 lightPosition;"
-    "uniform vec3 lightColor;"
 
-    "uniform float diffuseImpact;"
-    "uniform float specularImpact;"
+    "uniform PointLight pointLights[MAX_POINT_LIGHTS];"
+
+    "vec3 computePointLightContribution(PointLight pointLight, vec3 objectColor, vec3 normal, vec3 fragmentPosition, vec3 viewDirection)"
+    "{"
+    " vec3 lightDirection = normalize(pointLight.position - fragmentPosition);"
+    " vec3 reflectDirection = reflect(-lightDirection, normal);"
+
+    " vec3 ambient = pointLight.intensityAmbient * objectColor;"
+    " vec3 diffuse = pointLight.intensityDiffuse * pointLight.color *"
+    "                max(dot(normal, lightDirection), 0.f) * objectColor;"
+    " vec3 specular = pointLight.intensitySpecular * pointLight.color *"
+    "                 pow(max(dot(viewDirection, reflectDirection), 0.f), 64);" //no specular map yet
+
+    " float distance = length(pointLight.position - fragmentPosition);"
+    " float attenuation = 1.f / (1.f + "
+    "                            pointLight.attenuationLinear * distance +"
+    "                            pointLight.attenuationQuadratic * distance * distance);"
+
+    " return (ambient + diffuse + specular) * attenuation;"
+    "}"
 
     "void main()"
     "{"
-    " vec3 objectColor = texture2D(gColor, textureCoords).rgb;"
-
-    " vec3 ambient = 0.1f * lightColor;"
-
     " vec3 normal = texture2D(gNormal, textureCoords).rgb;"
-    " vec3 vertexPosition = texture2D(gPosition, textureCoords).rgb;"
-    " vec3 lightDirection = normalize(lightPosition - vertexPosition);"
-    " vec3 diffuse = diffuseImpact * max(dot(normal, lightDirection), 0.f) * lightColor;"
-
-    " vec3 viewDirection = normalize(viewPosition - vertexPosition);"
-    " vec3 reflectDirection = reflect(-lightDirection, normal);"
-    " float spec = pow(max(dot(viewDirection, reflectDirection), 0.f), 64);"
-    " vec3 specular = specularImpact * spec * lightColor;"
     " if(normal == vec3(0.f))"
     "  fragmentColor = vec4(.4f, .6f, .2f, 1.f);"
     " else"
-    "  fragmentColor = vec4((ambient + diffuse + specular) * objectColor, 1.f);"
+    " {"
+    "  vec3 objectColor = texture2D(gColor, textureCoords).rgb;"
+    "  vec3 fragmentPosition = texture2D(gPosition, textureCoords).rgb;"
+    "  vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
+    "  vec3 result = .1f * objectColor;"
+    "  for(int PointLightIndex = 0; PointLightIndex < MAX_POINT_LIGHTS; ++PointLightIndex)"
+    "  {"
+    "   result += computePointLightContribution(pointLights[PointLightIndex], objectColor, normal, fragmentPosition, viewDirection);"
+    "  }"
+    "  fragmentColor = vec4(result, 1.f);"
+    " }"
     "}";
 
   GLchar* guiVertexShaderSource =
@@ -522,15 +551,26 @@ int main()
 
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 6, SCREEN_HEIGHT),
     200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
+    5.f / SCREEN_WIDTH * 2,
+
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 12, SCREEN_HEIGHT),
+    200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
+    5.f / SCREEN_WIDTH * 2,
+
+
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 24, SCREEN_HEIGHT),
+    200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
+    20.f / SCREEN_WIDTH * 2,
+
+    P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT - 30, SCREEN_HEIGHT),
+    200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
     20.f / SCREEN_WIDTH * 2
   };
 
-  float sliderTs[] = {
-    .5f, .3f
-  };
+  float sliderTs[5] = {};
 
   SliderGUI sliderGUI = {};
-  initSliderGUI(&sliderGUI, sliderStaticInfo, sliderTs, 2);
+  initSliderGUI(&sliderGUI, sliderStaticInfo, sliderTs, 5);
 
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
@@ -553,8 +593,14 @@ int main()
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
 
-  float specularImpact = 0;
-  float diffuseImpact = 0;
+  float ambientIntensity = 0;
+  float specularIntensity = 0;
+  float diffuseIntensity = 0;
+
+  float linearAttenuation = 0;
+  float quadraticAttenuation = 0;
+
+  float* currentSlider = &ambientIntensity;
 
   GLfloat mouseCoordsAtLastFrameStart[2];
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
@@ -585,25 +631,26 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define SLIDERSPEED 25
-    if(keys[GLFW_KEY_3])
-      specularImpact -= SLIDERSPEED * dT;
-    if(keys[GLFW_KEY_4])
-      specularImpact += SLIDERSPEED * dT;
-
     if(keys[GLFW_KEY_1])
-      diffuseImpact -= SLIDERSPEED * dT;
-    if(keys[GLFW_KEY_2])
-      diffuseImpact += SLIDERSPEED * dT;
+      currentSlider = &ambientIntensity;
+    else if(keys[GLFW_KEY_2])
+      currentSlider = &diffuseIntensity;
+    else if(keys[GLFW_KEY_3])
+      currentSlider = &specularIntensity;
+    else if(keys[GLFW_KEY_4])
+      currentSlider = &linearAttenuation;
+    else if(keys[GLFW_KEY_5])
+      currentSlider = &quadraticAttenuation;
 
-    if(diffuseImpact < 0)
-      diffuseImpact = 0;
-    if(diffuseImpact > 255)
-      diffuseImpact = 255;
+    if(keys[GLFW_KEY_Q])
+      *currentSlider -= SLIDERSPEED * dT;
+    if(keys[GLFW_KEY_E])
+      *currentSlider += SLIDERSPEED * dT;
 
-    if(specularImpact < 0)
-      specularImpact = 0;
-    if(specularImpact > 255)
-      specularImpact = 255;
+    if(*currentSlider < 0)
+      *currentSlider = 0;
+    if(*currentSlider > 255)
+      *currentSlider = 255;
 
 #define ROTATION_SPEED .2f
     shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
@@ -638,15 +685,24 @@ int main()
 
     GLint viewPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "viewPosition");
     glUniform3fv(viewPositionLocation, 1, glm::value_ptr(camera.position));
-    GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "lightPosition");
+
+
+    GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
     glUniform3fv(lightPositionLocation, 1, glm::value_ptr(lightPosition));
-    GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "lightColor");
+    GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
     glUniform3fv(lightColorLocation, 1, glm::value_ptr(lightColor));
 
-    GLint diffuseImpactLocation = glGetUniformLocation(lPassShader.shaderProgramID, "diffuseImpact");
-    glUniform1f(diffuseImpactLocation, diffuseImpact / 255.f);
-    GLint specularImpactLocation = glGetUniformLocation(lPassShader.shaderProgramID, "specularImpact");
-    glUniform1f(specularImpactLocation, specularImpact / 255.f);
+    GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
+    glUniform1f(ambientIntensityLocation, ambientIntensity / 255.f);
+    GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
+    glUniform1f(diffuseIntensityLocation, diffuseIntensity / 255.f);
+    GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
+    glUniform1f(specularIntensityLocation, specularIntensity / 255.f);
+
+    GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
+    glUniform1f(linearAttenuationLocation, linearAttenuation / 255.f);
+    GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
+    glUniform1f(quadraticAttenuationLocation, quadraticAttenuation / 255.f);
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -659,16 +715,20 @@ int main()
     GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
     glUniform1f(onePixelLocation, 1.f / SCREEN_WIDTH * 2);
 
-    sliderTs[0] = diffuseImpact / 255.f;
-    sliderTs[1] = specularImpact / 255.f;
+    sliderTs[0] = ambientIntensity / 255.f;
+    sliderTs[1] = diffuseIntensity / 255.f;
+    sliderTs[2] = specularIntensity / 255.f;
+    sliderTs[3] = linearAttenuation / 255.f;
+    sliderTs[4] = quadraticAttenuation / 255.f;
+
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * 2,
+                 sizeof(float) * 5,
                  sliderTs,
                  GL_DYNAMIC_DRAW);
 
     glBindVertexArray(sliderGUI.VAO);
-    glDrawArrays(GL_POINTS, 0, 2);
+    glDrawArrays(GL_POINTS, 0, 5);
     glBindVertexArray(0);
 
     GLenum err;
