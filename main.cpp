@@ -375,6 +375,18 @@ int main()
     " return (ambient + diffuse + specular) * attenuation;"
     "}"
 
+    //This rand function is copy/pasted from interwebs.
+    //http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
+    "highp float rand(vec2 co)"
+    "{"
+    " highp float a = 12.9898;"
+    " highp float b = 78.233;"
+    " highp float c = 43758.5453;"
+    " highp float dt= dot(co.xy ,vec2(a,b));"
+    " highp float sn= mod(dt,3.14);"
+    " return fract(sin(sn) * c);"
+    "}"
+
     "void main()"
     "{"
     " vec3 normal = texture2D(gNormal, textureCoords).rgb;"
@@ -390,7 +402,7 @@ int main()
     "  {"
     "   result += computePointLightContribution(pointLights[PointLightIndex], objectColor, normal, fragmentPosition, viewDirection);"
     "  }"
-    "  fragmentColor = vec4(result, 1.f);"
+    "  fragmentColor = vec4(result + mix(-0.5f/255.f, 0.5f/255.f, rand(textureCoords)), 1.f);"
     " }"
     "}";
 
