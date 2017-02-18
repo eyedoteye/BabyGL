@@ -19,6 +19,18 @@
 #include <stdlib.h>
 #include <time.h>
 
+struct DirectionalLight
+{
+  glm::vec3 direction;
+  glm::vec3 color;
+  struct
+  {
+    float ambient;
+    float diffuse;
+    float specular;
+  } intensity;
+};
+
 struct PointLight
 {
   glm::vec3 position;
@@ -35,6 +47,13 @@ struct PointLight
     float quadratic;
   } attenuation;
 };
+
+void drawPointLightDebugModel(RenderObject debugModel, PointLight* pointLight, GLuint shaderProgramID)
+{
+  debugModel.model = glm::translate(debugModel.model, pointLight->position);
+  debugModel.color = pointLight->color;
+  drawRenderObject(&debugModel, shaderProgramID);
+}
 
 struct SliderGUI
 {
@@ -332,7 +351,18 @@ int main()
   GLchar* lPassFragmentShaderSource =
     "#version 400 core\n"
 
-    "#define MAX_POINT_LIGHTS 1\n"
+    "#define MAX_DIRECTIONAL_LIGHTS 1\n"
+    "struct DirectionalLight"
+    "{"
+    " vec3 color;"
+    " vec3 direction;"
+
+    " float intensityAmbient;"
+    " float intensityDiffuse;"
+    " float intensitySpecular;"
+    "};"
+
+    "\n#define MAX_POINT_LIGHTS 1\n"
     "struct PointLight"
     "{"
     " vec3 color;"
@@ -354,7 +384,22 @@ int main()
     "uniform sampler2D gColor;"
     "uniform vec3 viewPosition;"
 
+    "uniform DirectionalLight directionalLights[MAX_DIRECTIONAL_LIGHTS];"
     "uniform PointLight pointLights[MAX_POINT_LIGHTS];"
+
+    "vec3 computeDirectionalLightContribution(DirectionalLight directionalLight, vec3 objectColor, vec3 normal, vec3 fragmentPosition, vec3 viewDirection)"
+    "{"
+    " vec3 lightDirection = normalize(-directionalLight.direction);"
+    " vec3 reflectDirection = reflect(-lightDirection, normal);"
+
+    " vec3 ambient = directionalLight.intensityAmbient * objectColor;"
+    " vec3 diffuse = directionalLight.intensityDiffuse * directionalLight.color *"
+    "                max(dot(normal, lightDirection), 0.f) * objectColor;"
+    " vec3 specular = directionalLight.intensitySpecular * directionalLight.color *"
+    "                 pow(max(dot(viewDirection, reflectDirection), 0.f), 64);" //no specular map yet
+
+    " return (ambient + diffuse + specular);"
+    "}"
 
     "vec3 computePointLightContribution(PointLight pointLight, vec3 objectColor, vec3 normal, vec3 fragmentPosition, vec3 viewDirection)"
     "{"
@@ -398,6 +443,10 @@ int main()
     "  vec3 fragmentPosition = texture2D(gPosition, textureCoords).rgb;"
     "  vec3 viewDirection = normalize(viewPosition - fragmentPosition);"
     "  vec3 result = .1f * objectColor;"
+    "  for(int DirectionalLightIndex = 0; DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS; ++DirectionalLightIndex)"
+    "  {"
+    "   result += computeDirectionalLightContribution(directionalLights[DirectionalLightIndex], objectColor, normal, fragmentPosition, viewDirection);"
+    "  }"
     "  for(int PointLightIndex = 0; PointLightIndex < MAX_POINT_LIGHTS; ++PointLightIndex)"
     "  {"
     "   result += computePointLightContribution(pointLights[PointLightIndex], objectColor, normal, fragmentPosition, viewDirection);"
@@ -603,14 +652,20 @@ int main()
   Camera camera;
   initCamera(&camera, (GLfloat)width, (GLfloat)height);
 
+  DirectionalLight directionalLights[1] = {};
+  directionalLights[0].direction = glm::vec3(0.f, 5.f, -2.f);
+  directionalLights[0].color = glm::vec3(0.f, 1.f, 0.f);
+  directionalLights[0].intensity.ambient = 255 * 0.1f;
+  directionalLights[0].intensity.diffuse = 255 * 0.5f;
+  directionalLights[0].intensity.specular = 255 * 0.5f;
+
   PointLight pointLights[1] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
-  pointLights[0].color = glm::vec3(1.f,0.f,0.f);
+  pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
   RenderObject lightShape;
   initRenderObject(&lightShape,
-                   par_shapes_create_cube());
-  lightShape.model = glm::translate(lightShape.model,
-                                    pointLights[0].position);
+                   par_shapes_create_parametric_sphere(32, 32));
+  lightShape.model = glm::scale(lightShape.model, glm::vec3(0.5f, 0.5f, 0.5f));
   lightShape.color = pointLights[0].color;
 
   RenderObject shape;
@@ -620,7 +675,7 @@ int main()
 
   RenderObject shape2;
   initRenderObject(&shape2,
-                   par_shapes_create_parametric_sphere(32,32));
+                   par_shapes_create_parametric_sphere(32, 32));
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
 
@@ -696,7 +751,7 @@ int main()
 
     drawRenderObject(&shape2, gPassShader.shaderProgramID);
     drawRenderObject(&shape, gPassShader.shaderProgramID);
-    drawRenderObject(&lightShape, gPassShader.shaderProgramID);
+    drawPointLightDebugModel(lightShape, &pointLights[0], gPassShader.shaderProgramID);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -711,23 +766,38 @@ int main()
     GLint viewPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "viewPosition");
     glUniform3fv(viewPositionLocation, 1, glm::value_ptr(camera.position));
 
+    {
+      GLint lightDirectionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].direction");
+      glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(directionalLights[0].direction));
+      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].color");
+      glUniform3fv(lightColorLocation, 1, glm::value_ptr(directionalLights[0].color));
 
-    GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
-    glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
-    GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
-    glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
+      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensityAmbient");
+      glUniform1f(ambientIntensityLocation, directionalLights[0].intensity.ambient / 255.f);
+      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensityDiffuse");
+      glUniform1f(diffuseIntensityLocation, directionalLights[0].intensity.diffuse / 255.f);
+      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensitySpecular");
+      glUniform1f(specularIntensityLocation, directionalLights[0].intensity.specular / 255.f);
+    }
 
-    GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
-    glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
-    GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
-    glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
-    GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
-    glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
+    {
+      GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
+      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
+      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
+      glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
 
-    GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
-    glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
-    GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
-    glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
+      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
+      glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
+      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
+      glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
+      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
+      glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
+
+      GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
+      glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
+      GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
+      glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
+    }
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
