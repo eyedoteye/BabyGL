@@ -36,17 +36,25 @@ struct PointLight
 {
   glm::vec3 position;
   glm::vec3 color;
-  struct
+  union
   {
-    float ambient;
-    float diffuse;
-    float specular;
-  } intensity;
-  struct
+    struct
+    {
+      float ambient;
+      float diffuse;
+      float specular;
+    } intensity;
+    float intensities[3];
+  };
+  union
   {
-    float linear;
-    float quadratic;
-  } attenuation;
+    struct
+    {
+      float linear;
+      float quadratic;
+    } attenuation;
+    float attenuations[2];
+  };
 };
 
 void drawPointLightDebugModel(RenderObject debugModel, PointLight* pointLight, GLuint shaderProgramID)
@@ -59,28 +67,27 @@ void drawPointLightDebugModel(RenderObject debugModel, PointLight* pointLight, G
 struct SliderGUI
 {
   GLuint VAO;
-  GLuint vboPositions, vboTs;
+  GLuint vboPositions, vboTs, vboIsSelecteds;
 
   int count;
   float* positions;
   float* ts;
+  int* isSelecteds;
 };
 
-void initSliderGUI(SliderGUI *sliderGUI, float* positions, float* ts, int count)
+void initSliderGUI(SliderGUI *sliderGUI, int count)
 {
   glGenVertexArrays(1, &sliderGUI->VAO);
   glGenBuffers(1, &sliderGUI->vboPositions);
   glGenBuffers(1, &sliderGUI->vboTs);
-
-  sliderGUI->positions = positions;
-  sliderGUI->ts = ts;
+  glGenBuffers(1, &sliderGUI->vboIsSelecteds);
 
   glBindVertexArray(sliderGUI->VAO);
   {
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboPositions);
     glBufferData(GL_ARRAY_BUFFER,
                  sizeof(float) * count * 5,
-                 positions,
+                 sliderGUI->positions,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
                           sizeof(float) * 5,
@@ -95,21 +102,32 @@ void initSliderGUI(SliderGUI *sliderGUI, float* positions, float* ts, int count)
                           (GLvoid*)(4 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
-    glBindBuffer(GL_ARRAY_BUFFER,  sliderGUI->vboTs);
+    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboTs);
     glBufferData(GL_ARRAY_BUFFER,
                  sizeof(float) * count,
-                 ts,
+                 sliderGUI->ts,
                  GL_DYNAMIC_DRAW);
     glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
                           sizeof(float),
                           (GLvoid*)0);
     glEnableVertexAttribArray(3);
+
+    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboIsSelecteds);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(int) * count,
+                 sliderGUI->isSelecteds,
+                 GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(4, 1, GL_INT, GL_FALSE,
+                          sizeof(int),
+                          (GLvoid*)0);
+    glEnableVertexAttribArray(4);
   }
 }
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-static bool keys[1024];
+static bool keysPressed[1024];
+static bool keysHeld[1024];
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
   if(key == GLFW_KEY_ESCAPE)
@@ -119,11 +137,12 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 
   if(action == GLFW_PRESS)
   {
-    keys[key] = true;
+    keysPressed[key] = true;
+    keysHeld[key] = true; 
   }
   else if(action == GLFW_RELEASE)
   {
-    keys[key] = false;
+    keysHeld[key] = false;
   }
 }
 
@@ -309,9 +328,13 @@ int main()
   };
 
   float sliderTs[5] = {};
+  int sliderIsSelecteds[5] = {};
 
   SliderGUI sliderGUI = {};
-  initSliderGUI(&sliderGUI, sliderStaticInfo, sliderTs, 5);
+  sliderGUI.positions = sliderStaticInfo;
+  sliderGUI.ts = sliderTs;
+  sliderGUI.isSelecteds = sliderIsSelecteds;
+  initSliderGUI(&sliderGUI, 5);
 
   GLuint perlinNoiseTextureID;
   glGenTextures(1, &perlinNoiseTextureID);
@@ -347,8 +370,24 @@ int main()
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
 
-  float* currentSlider = &pointLights[0].intensity.ambient;
-
+  char currentPointLightIndex = 0;
+  char currentSliderIndex = 0;
+  float* currentLightSliders[5] = {};
+  for(int intensityIndex = 0;
+      intensityIndex < 3;
+      ++intensityIndex)
+  {
+    currentLightSliders[intensityIndex] =
+      &pointLights[currentPointLightIndex].intensities[intensityIndex];
+  }
+  for(int attenuationIndex = 0;
+      attenuationIndex < 2;
+      ++attenuationIndex)
+  {
+    currentLightSliders[3 + attenuationIndex] =
+      &pointLights[currentPointLightIndex].attenuations[attenuationIndex];
+  }
+  
   GLfloat mouseCoordsAtLastFrameStart[2];
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
   mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
@@ -362,6 +401,8 @@ int main()
 
     timeAtLastFrameStart = timeNow;
 
+    memset(keysPressed, 0, 1024 * sizeof(bool)); 
+
     glfwPollEvents();
 
     GLfloat mouseCoordsNow[2];
@@ -371,33 +412,33 @@ int main()
     updateCamera(&camera,
                  mouseCoordsNow[0] - mouseCoordsAtLastFrameStart[0],
                  mouseCoordsNow[1] - mouseCoordsAtLastFrameStart[1],
-                 keys,
+                 keysHeld,
                  dT);
 
     mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
-#define SLIDERSPEED 25
-    if(keys[GLFW_KEY_1])
-      currentSlider = &pointLights[0].intensity.ambient;
-    else if(keys[GLFW_KEY_2])
-      currentSlider = &pointLights[0].intensity.diffuse;
-    else if(keys[GLFW_KEY_3])
-      currentSlider = &pointLights[0].intensity.specular;
-    else if(keys[GLFW_KEY_4])
-      currentSlider = &pointLights[0].attenuation.linear;
-    else if(keys[GLFW_KEY_5])
-      currentSlider = &pointLights[0].attenuation.quadratic;
+#define SLIDERSPEED 25 
+    if(keysPressed[GLFW_KEY_1])
+      --currentSliderIndex;
+    else if(keysPressed[GLFW_KEY_2])
+      ++currentSliderIndex;
 
-    if(keys[GLFW_KEY_Q])
-      *currentSlider -= SLIDERSPEED * dT;
-    if(keys[GLFW_KEY_E])
-      *currentSlider += SLIDERSPEED * dT;
+    if(currentSliderIndex < 0)
+      currentSliderIndex = 4;
+    else if(currentSliderIndex > 4)
+      currentSliderIndex = 0;
 
-    if(*currentSlider < 0)
-      *currentSlider = 0;
-    if(*currentSlider > 255)
-      *currentSlider = 255;
+    float* currentLightSlider = currentLightSliders[currentSliderIndex];
+    if(keysHeld[GLFW_KEY_Q])
+      *currentLightSlider -= SLIDERSPEED * dT;
+    if(keysHeld[GLFW_KEY_E])
+      *currentLightSlider += SLIDERSPEED * dT;
+
+    if(*currentLightSlider < 0)
+      *currentLightSlider = 0;
+    if(*currentLightSlider > 255)
+      *currentLightSlider = 255;
 
 #define ROTATION_SPEED .2f
     shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
@@ -483,12 +524,27 @@ int main()
     sliderTs[2] = pointLights[0].intensity.specular / 255.f;
     sliderTs[3] = pointLights[0].attenuation.linear / 255.f;
     sliderTs[4] = pointLights[0].attenuation.quadratic / 255.f;
-
+  
     glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
     glBufferData(GL_ARRAY_BUFFER,
                  sizeof(float) * 5,
-                 sliderTs,
+                 sliderGUI.ts,
                  GL_DYNAMIC_DRAW);
+
+    for(int sliderIndex = 0;
+    sliderIndex < 5;
+    ++sliderIndex)
+    {
+        sliderIsSelecteds[sliderIndex] = 0;  
+    }
+    sliderIsSelecteds[currentSliderIndex] = 1;
+
+    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboIsSelecteds);
+    glBufferData(GL_ARRAY_BUFFER,
+                 sizeof(int) * 5,
+                 sliderGUI.isSelecteds,
+                 GL_DYNAMIC_DRAW);
+
 
     glBindVertexArray(sliderGUI.VAO);
     glDrawArrays(GL_POINTS, 0, 5);
