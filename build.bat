@@ -1,5 +1,7 @@
 @echo off
 
+del *.swp > NUL 2>NUL
+
 IF NOT EXIST build mkdir build
 pushd build
 
