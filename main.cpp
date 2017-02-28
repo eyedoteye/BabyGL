@@ -571,7 +571,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(guiShader.shaderProgramID);
 
