@@ -57,6 +57,26 @@ struct PointLight
   };
 };
 
+void flattenPointLightSliders(
+  PointLight* pointLight,
+  float** lightSlidersArray)
+{
+for(int intensityIndex = 0;
+      intensityIndex < 3;
+      ++intensityIndex)
+  {
+    lightSlidersArray[intensityIndex] =
+      &pointLight->intensities[intensityIndex];
+  }
+  for(int attenuationIndex = 0;
+      attenuationIndex < 2;
+      ++attenuationIndex)
+  {
+    lightSlidersArray[3 + attenuationIndex] =
+      &pointLight->attenuations[attenuationIndex];
+  }
+}
+
 void drawPointLightDebugModel(RenderObject debugModel, PointLight* pointLight, GLuint shaderProgramID)
 {
   debugModel.model = glm::translate(debugModel.model, pointLight->position);
@@ -350,7 +370,8 @@ int main()
   directionalLights[0].intensity.diffuse = 255 * 0.5f;
   directionalLights[0].intensity.specular = 255 * 0.5f;
 
-  PointLight pointLights[1] = {};
+#define NUM_POINT_LIGHTS 1
+  PointLight pointLights[NUM_POINT_LIGHTS] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
   pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
   RenderObject lightShape;
@@ -373,21 +394,9 @@ int main()
   char currentPointLightIndex = 0;
   char currentSliderIndex = 0;
   float* currentLightSliders[5] = {};
-  for(int intensityIndex = 0;
-      intensityIndex < 3;
-      ++intensityIndex)
-  {
-    currentLightSliders[intensityIndex] =
-      &pointLights[currentPointLightIndex].intensities[intensityIndex];
-  }
-  for(int attenuationIndex = 0;
-      attenuationIndex < 2;
-      ++attenuationIndex)
-  {
-    currentLightSliders[3 + attenuationIndex] =
-      &pointLights[currentPointLightIndex].attenuations[attenuationIndex];
-  }
-  
+  flattenPointLightSliders(&pointLights[currentPointLightIndex],
+                           currentLightSliders);
+    
   GLfloat mouseCoordsAtLastFrameStart[2];
   mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
   mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
@@ -419,15 +428,24 @@ int main()
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
 #define SLIDERSPEED 25 
+    if(keysPressed[GLFW_KEY_TAB])
+    {
+      if(keysPressed[GLFW_MOD_SHIFT])
+        --currentPointLightIndex;     
+      else
+        ++currentPointLightIndex;
+      
+      currentPointLightIndex = (currentPointLightIndex + NUM_POINT_LIGHTS)
+                                  % NUM_POINT_LIGHTS;
+      flattenPointLightSliders(&pointLights[currentPointLightIndex],
+                               currentLightSliders);
+    }
+
     if(keysPressed[GLFW_KEY_1])
       --currentSliderIndex;
     else if(keysPressed[GLFW_KEY_2])
       ++currentSliderIndex;
-
-    if(currentSliderIndex < 0)
-      currentSliderIndex = 4;
-    else if(currentSliderIndex > 4)
-      currentSliderIndex = 0;
+    currentSliderIndex = (currentSliderIndex + 5) % 5;
 
     float* currentLightSlider = currentLightSliders[currentSliderIndex];
     if(keysHeld[GLFW_KEY_Q])
