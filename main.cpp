@@ -476,10 +476,15 @@ int main()
     }
 
     if(keysPressed[GLFW_KEY_1])
-      --currentSliderIndex;
+      currentSliderIndex = 0;
     else if(keysPressed[GLFW_KEY_2])
-      ++currentSliderIndex;
-    currentSliderIndex = (currentSliderIndex + 5) % 5;
+      currentSliderIndex = 1;
+    else if(keysPressed[GLFW_KEY_3])
+      currentSliderIndex = 2;
+    else if(keysPressed[GLFW_KEY_4])
+      currentSliderIndex = 3;
+    else if(keysPressed[GLFW_KEY_5])
+      currentSliderIndex = 4;
 
     float* currentLightSlider = currentLightSliders[currentSliderIndex];
     if(keysHeld[GLFW_KEY_Q])

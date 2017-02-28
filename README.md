@@ -2,7 +2,7 @@
 2/1/2017 12:52 AM: I have discovered.. ~spooky sounds~.  
 
 Tab, Shift+Tab is Cycle Through Point Lights
-1,2 is Cycle Through Sliders  
+1-5 is Select Slider    
 Q,E is Move Slider  
 W,A,S,D,Shift,Space is Move  
   
