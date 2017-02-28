@@ -61,7 +61,7 @@ void flattenPointLightSliders(
   PointLight* pointLight,
   float** lightSlidersArray)
 {
-for(int intensityIndex = 0;
+  for(int intensityIndex = 0;
       intensityIndex < 3;
       ++intensityIndex)
   {
@@ -77,7 +77,10 @@ for(int intensityIndex = 0;
   }
 }
 
-void drawPointLightDebugModel(RenderObject debugModel, PointLight* pointLight, GLuint shaderProgramID)
+void drawPointLightDebugModel(
+    RenderObject debugModel,
+    PointLight* pointLight,
+    GLuint shaderProgramID)
 {
   debugModel.model = glm::translate(debugModel.model, pointLight->position);
   debugModel.color = pointLight->color;
@@ -246,12 +249,12 @@ int main()
   linkShaderObject(&lPassShader);
 
   glUseProgram(lPassShader.shaderProgramID);
-  GLuint gPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gPosition");
-  glUniform1i(gPositionLocation, 0);
-  GLuint gNormalLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gNormal");
-  glUniform1i(gNormalLocation, 1);
-  GLuint gColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "gColor");
-  glUniform1i(gColorLocation, 2);
+  GLuint positionBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "positionBuffer");
+  glUniform1i(positionBufferLocation, 0);
+  GLuint normalBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "normalBuffer");
+  glUniform1i(normalBufferLocation, 1);
+  GLuint colorBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "colorBuffer");
+  glUniform1i(colorBufferLocation, 2);
 
   ShaderObject guiShader = {};
   guiShader.vertexShaderSource = guiVertexShaderSource;
@@ -260,40 +263,65 @@ int main()
   compileShaderObject(&guiShader);
   linkShaderObject(&guiShader);
 
-  GLuint gBuffer;
-  glGenFramebuffers(1, &gBuffer);
-  glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-  GLuint gPosition, gNormal, gColor;
+  GLuint gBufferID;
+  glGenFramebuffers(1, &gBufferID);
+  glBindFramebuffer(GL_FRAMEBUFFER, gBufferID);
+  
+  // Note: gBuffer textures for defaulty shaded objects. 
+  GLuint positionBufferID, normalBufferID, colorBufferID;
 
-  glGenTextures(1, &gPosition);
-  glBindTexture(GL_TEXTURE_2D, gPosition);
+  glGenTextures(1, &positionBufferID);
+  glBindTexture(GL_TEXTURE_2D, positionBufferID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                         gPosition, 0);
+                         positionBufferID, 0);
 
-  glGenTextures(1, &gNormal);
-  glBindTexture(GL_TEXTURE_2D, gNormal);
+  glGenTextures(1, &normalBufferID);
+  glBindTexture(GL_TEXTURE_2D, normalBufferID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
-                         gNormal, 0);
+                         normalBufferID, 0);
 
-  glGenTextures(1, &gColor);
-  glBindTexture(GL_TEXTURE_2D, gColor);
+  glGenTextures(1, &colorBufferID);
+  glBindTexture(GL_TEXTURE_2D, colorBufferID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D,
-                         gColor, 0);
+                         colorBufferID, 0);
+  
+  // Note: gBuffer textures for point lights.
+  GLuint pointLightPositionBufferID, pointLightColorBufferID;
 
-  GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-  glDrawBuffers(3, attachments);
+  glGenTextures(1, &pointLightPositionBufferID);
+  glBindTexture(GL_TEXTURE_2D, pointLightPositionBufferID);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
+               GL_RGB, GL_FLOAT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D,
+                         pointLightPositionBufferID, 0);
+
+  glGenTextures(1, &pointLightColorBufferID);
+  glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
+               GL_RGB, GL_FLOAT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D,
+                         pointLightColorBufferID, 0);
+
+  GLuint attachments[5] = {
+    GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
+    GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4};
+  glDrawBuffers(5, attachments);
 
   GLuint rboDepth;
   glGenRenderbuffers(1, &rboDepth);
@@ -374,22 +402,26 @@ int main()
   PointLight pointLights[NUM_POINT_LIGHTS] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
   pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
+
   RenderObject lightShape;
-  initRenderObject(&lightShape,
-                   par_shapes_create_parametric_sphere(32, 32));
+  lightShape.objectType = OBJECT_TYPE_POINTLIGHT;
+  lightShape.mesh = par_shapes_create_parametric_sphere(32, 32);
   lightShape.model = glm::scale(lightShape.model, glm::vec3(0.5f, 0.5f, 0.5f));
-  lightShape.color = pointLights[0].color;
+  initRenderObject(&lightShape);  
 
   RenderObject shape;
-  initRenderObject(&shape,
-                   par_shapes_create_parametric_sphere(32, 32));
+  shape.objectType = OBJECT_TYPE_DEFAULT;
+  shape.mesh = par_shapes_create_parametric_sphere(32, 32);
   shape.model = glm::translate(shape.model, glm::vec3(0.f, 0.f, 0.f));
+  shape.color = glm::vec3(0.7f); 
+  initRenderObject(&shape);
 
   RenderObject shape2;
-  initRenderObject(&shape2,
-                   par_shapes_create_parametric_sphere(32, 32));
+  shape2.objectType = OBJECT_TYPE_DEFAULT;
+  shape2.mesh = par_shapes_create_parametric_sphere(32, 32);
   shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
   shape2.color = glm::vec3(.2f, 1.f, 1.f);
+  initRenderObject(&shape2);
 
   char currentPointLightIndex = 0;
   char currentSliderIndex = 0;
@@ -465,7 +497,7 @@ int main()
     shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, -5.f));
 
-    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferID);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(gPassShader.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
@@ -484,11 +516,11 @@ int main()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(lPassShader.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glBindTexture(GL_TEXTURE_2D, positionBufferID);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glBindTexture(GL_TEXTURE_2D, normalBufferID);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, gColor);
+    glBindTexture(GL_TEXTURE_2D, colorBufferID);
 
     GLint viewPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "viewPosition");
     glUniform3fv(viewPositionLocation, 1, glm::value_ptr(camera.position));

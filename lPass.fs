@@ -29,9 +29,9 @@ uniform PointLight pointLights[MAX_POINT_LIGHTS];
 out vec4 fragmentColor;
 in vec2 textureCoords;
 
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
-uniform sampler2D gColor;
+uniform sampler2D positionBuffer;
+uniform sampler2D normalBuffer;
+uniform sampler2D colorBuffer;
 uniform vec3 viewPosition;
 
 vec3 computeDirectionalLightContribution(
@@ -92,12 +92,13 @@ highp float rand(vec2 co) {
 }
 
 void main() {
-  vec3 normal = texture2D(gNormal, textureCoords).rgb;
+  vec3 normal = texture(normalBuffer, textureCoords).rgb;
+
   if(normal == vec3(0.f)) {
     fragmentColor = vec4(.4f, .6f, .2f, 1.f);
   } else {
-    vec3 objectColor = texture2D(gColor, textureCoords).rgb;
-    vec3 fragmentPosition = texture2D(gPosition, textureCoords).rgb;
+    vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
+    vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
     vec3 viewDirection = normalize(viewPosition - fragmentPosition);
       
       vec3 result = .1f * objectColor;

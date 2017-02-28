@@ -1,5 +1,9 @@
+#define OBJECT_TYPE_DEFAULT 0
+#define OBJECT_TYPE_POINTLIGHT 1
+
 struct RenderObject
 {
+  int objectType;
   par_shapes_mesh* mesh;
   GLuint VAO, EBO;
   GLuint vboPositions, vboNormals, vboUVCoords;
@@ -13,13 +17,15 @@ void updateRenderObject(RenderObject *renderableModel)
   {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderableModel->EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 sizeof(*renderableModel->mesh->triangles) * renderableModel->mesh->ntriangles * 3,
+                 sizeof(*renderableModel->mesh->triangles)
+                   * renderableModel->mesh->ntriangles * 3,
                  renderableModel->mesh->triangles,
                  GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, renderableModel->vboPositions);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(*renderableModel->mesh->points) * 3 * renderableModel->mesh->npoints,
+                 sizeof(*renderableModel->mesh->points) * 3
+                   * renderableModel->mesh->npoints,
                  renderableModel->mesh->points,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
@@ -29,7 +35,8 @@ void updateRenderObject(RenderObject *renderableModel)
 
     glBindBuffer(GL_ARRAY_BUFFER, renderableModel->vboNormals);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(*renderableModel->mesh->normals) * 3 * renderableModel->mesh->npoints,
+                 sizeof(*renderableModel->mesh->normals) * 3
+                   * renderableModel->mesh->npoints,
                  renderableModel->mesh->normals,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
@@ -39,7 +46,8 @@ void updateRenderObject(RenderObject *renderableModel)
 
     glBindBuffer(GL_ARRAY_BUFFER, renderableModel->vboUVCoords);
     glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(*renderableModel->mesh->tcoords) * 2 * renderableModel->mesh->npoints,
+                 sizeof(*renderableModel->mesh->tcoords) * 2
+                   * renderableModel->mesh->npoints,
                  renderableModel->mesh->normals,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
@@ -49,11 +57,10 @@ void updateRenderObject(RenderObject *renderableModel)
   }
 }
 
-void initRenderObject(RenderObject *renderableModel, par_shapes_mesh *shapeMesh)
+// Note: Add a flyweight system that inits with defaults
+// if any parameters are missing.
+void initRenderObject(RenderObject *renderableModel)
 {
-  renderableModel->mesh = shapeMesh;
-  renderableModel->color = glm::vec3(.7f, .7f, .7f);
-
   glGenVertexArrays(1, &renderableModel->VAO);
   glGenBuffers(1, &renderableModel->EBO);
   glGenBuffers(1, &renderableModel->vboPositions);
@@ -65,6 +72,8 @@ void initRenderObject(RenderObject *renderableModel, par_shapes_mesh *shapeMesh)
 
 void drawRenderObject(RenderObject *renderableModel, GLint shaderProgramID)
 {
+  GLint objectTypeLocation = glGetUniformLocation(shaderProgramID, "objectType");
+  glUniform1i(objectTypeLocation, renderableModel->objectType); 
   GLint modelLocation = glGetUniformLocation(shaderProgramID, "model");
   glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(renderableModel->model));
   GLint objectColorLocation = glGetUniformLocation(shaderProgramID, "objectColor");
@@ -77,5 +86,5 @@ void drawRenderObject(RenderObject *renderableModel, GLint shaderProgramID)
 
 void destroyRenderObject(RenderObject *renderableModel)
 {
-  GLuint buffers[3];
+  // Todo
 }
