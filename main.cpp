@@ -179,6 +179,8 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
+
+// Note: Lol, winmain
 int main()
 {
   glfwInit();
