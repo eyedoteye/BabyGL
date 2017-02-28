@@ -12,5 +12,6 @@ Sliders:
 3. SpecularIntensity  
 4. LinearAttenuation  
 5. QuadraticAttenuation 
-
-2/26/2017 9:16PM Currently undergoing some clean-up.
+  
+2/26/2017 9:16PM Currently undergoing some clean-up.  
+2/28/2017 1:28AM Some laggy frames have been popping up. Investigation needed.
