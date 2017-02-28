@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include <windows.h>
+
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -179,9 +181,8 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
-
-// Note: Lol, winmain
-int main()
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    PSTR lpCmdLine, INT nCmdShow)
 {
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -189,7 +190,8 @@ int main()
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut",
+                                        NULL, NULL);
   if(!window)
   {
     printf("GLFW window creation failure.\n");

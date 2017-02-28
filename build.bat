@@ -14,7 +14,7 @@ set GLEWLibDirectory=..\Libs\GL
 set PreprocessorFlags=-DPAR_SHAPES_IMPLEMENTATION
 set CompilerFlags=-MTd -nologo -GR- -Od -W4 -Z7 -FC -wd4201 -EHa -I %IncludesDirectory%
 
-set LinkerFlags=-SUBSYSTEM:WINDOWS -ENTRY:mainCRTStartup -INCREMENTAL:NO -opt:ref user32.lib gdi32.lib shell32.lib opengl32.lib -LIBPATH:%GLFWLibDirectory% glfw3.lib -LIBPATH:%GLEWLibDirectory% libglew32d.lib
+set LinkerFlags=-SUBSYSTEM:WINDOWS -INCREMENTAL:NO -opt:ref user32.lib gdi32.lib shell32.lib opengl32.lib -LIBPATH:%GLFWLibDirectory% glfw3.lib -LIBPATH:%GLEWLibDirectory% libglew32d.lib
 
 cl %PreprocessorFlags% %CompilerFlags% ..\main.cpp /link %LinkerFlags%
 popd
