@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include <windows.h>
+//#include <windows.h>
 
 #define GLEW_STATIC
 #include <GL/glew.h>
@@ -181,8 +181,9 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
-int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    PSTR lpCmdLine, INT nCmdShow)
+//int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+//    PSTR lpCmdLine, INT nCmdShow)
+int main()
 {
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -229,6 +230,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   GLchar* lPassFragmentShaderSource =
     #include "lPass.fs"
 
+  GLchar* debugObjectsVertexShaderSource =
+    #include "debugObjects.vs"
+  GLchar* debugObjectsFragmentShaderSource =
+    #include "debugObjects.fs"
+
   GLchar* guiVertexShaderSource =
     #include "gui.vs"
   GLchar* guiGeometryShaderSource =
@@ -245,7 +251,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   glUseProgram(gPassShader.shaderProgramID);
   GLuint perlinNoiseLocation = glGetUniformLocation(gPassShader.shaderProgramID, "perlinNoise");
   glUniform1i(perlinNoiseLocation, 0);
-
+printf("test");
   ShaderObject lPassShader = {};
   lPassShader.vertexShaderSource = lPassVertexShaderSource;
   lPassShader.fragmentShaderSource = lPassFragmentShaderSource;
@@ -259,6 +265,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   glUniform1i(normalBufferLocation, 1);
   GLuint colorBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "colorBuffer");
   glUniform1i(colorBufferLocation, 2);
+  glUseProgram(0);
+
+  ShaderObject debugObjectsShader = {};
+  debugObjectsShader.vertexShaderSource = debugObjectsVertexShaderSource;
+  debugObjectsShader.fragmentShaderSource = debugObjectsFragmentShaderSource;
+  compileShaderObject(&debugObjectsShader);
+  linkShaderObject(&debugObjectsShader);
+
+//  glUseProgram(debugObjectsShader.shaderProgramID);
+//  GLuint pointLightColorBufferLocation = glGetUniformLocation(debugObjectsShader.shaderProgramID, "colorBuffer");
+//  glUniform1i(pointLightColorBufferLocation, 3);
 
   ShaderObject guiShader = {};
   guiShader.vertexShaderSource = guiVertexShaderSource;
@@ -302,16 +319,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                          colorBufferID, 0);
   
   // Note: gBuffer textures for point lights.
-  GLuint pointLightPositionBufferID, pointLightColorBufferID;
-
-  glGenTextures(1, &pointLightPositionBufferID);
-  glBindTexture(GL_TEXTURE_2D, pointLightPositionBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D,
-                         pointLightPositionBufferID, 0);
+  GLuint pointLightColorBufferID;
 
   glGenTextures(1, &pointLightColorBufferID);
   glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
@@ -319,13 +327,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D,
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D,
                          pointLightColorBufferID, 0);
 
-  GLuint attachments[5] = {
+  GLuint attachments[4] = {
     GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
-    GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4};
-  glDrawBuffers(5, attachments);
+    GL_COLOR_ATTACHMENT3};
+  glDrawBuffers(4, attachments);
 
   GLuint rboDepth;
   glGenRenderbuffers(1, &rboDepth);
