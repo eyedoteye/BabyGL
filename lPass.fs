@@ -94,24 +94,22 @@ highp float rand(vec2 co) {
 void main() {
   vec3 normal = texture(normalBuffer, textureCoords).rgb;
 
-  if(normal == vec3(0.f)) {
-    fragmentColor = vec4(.4f, .6f, .2f, 1.f);
+  if(normal == vec3(0.f))
+  {
+    discard;
   } else {
-    vec4 objectColor = texture(colorBuffer, textureCoords);
-    if(objectColor.a == 0.f)
-      discard;
-      
+    vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
     vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
     vec3 viewDirection = normalize(viewPosition - fragmentPosition);
       
-      vec3 result = .1f * objectColor.rgb;
+      vec3 result = .1f * objectColor;
       for(int DirectionalLightIndex = 0;
           DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS;
           ++DirectionalLightIndex
       ) {
         result += computeDirectionalLightContribution(
             directionalLights[DirectionalLightIndex],
-            objectColor.rgb,
+            objectColor,
             normal,
             fragmentPosition,
             viewDirection);
@@ -122,7 +120,7 @@ void main() {
       ) {
         result += computePointLightContribution(
           pointLights[PointLightIndex],
-          objectColor.rgb,
+          objectColor,
           normal,
           fragmentPosition,
           viewDirection);

@@ -1,6 +1,3 @@
-#define OBJECT_TYPE_DEFAULT 0
-#define OBJECT_TYPE_POINTLIGHT 1
-
 struct RenderObject
 {
   int objectType;
