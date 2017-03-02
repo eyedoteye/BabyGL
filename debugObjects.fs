@@ -8,6 +8,6 @@ uniform sampler2D colorBuffer;
 
 void main()
 {
-  fragmentColor = texture(colorBuffer, textureCoords);
+  fragmentColor = vec4(texture(colorBuffer, textureCoords).rgb, 1.f);
 }
 )"";

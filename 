@@ -1,6 +1,6 @@
 #include <stdio.h>
 //Todo: Use define to quick swap between windows mode and console mode.
-#include <windows.h>
+//#include <windows.h>
 
 #define GLEW_STATIC
 #include <GL/glew.h>
@@ -273,9 +273,9 @@ int main()
   compileShaderObject(&debugObjectsShader);
   linkShaderObject(&debugObjectsShader);
 
-  glUseProgram(debugObjectsShader.shaderProgramID);
-  GLuint pointLightColorBufferLocation = glGetUniformLocation(debugObjectsShader.shaderProgramID, "colorBuffer");
-  glUniform1i(pointLightColorBufferLocation, 0);
+//  glUseProgram(debugObjectsShader.shaderProgramID);
+//  GLuint pointLightColorBufferLocation = glGetUniformLocation(debugObjectsShader.shaderProgramID, "colorBuffer");
+//  glUniform1i(pointLightColorBufferLocation, 3);
 
   ShaderObject guiShader = {};
   guiShader.vertexShaderSource = guiVertexShaderSource;
@@ -311,7 +311,7 @@ int main()
 
   glGenTextures(1, &colorBufferID);
   glBindTexture(GL_TEXTURE_2D, colorBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
                GL_RGB, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -578,9 +578,8 @@ int main()
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    //glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(debugObjectsShader.shaderProgramID);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
 
     glBindVertexArray(quadVAO);
@@ -636,7 +635,6 @@ int main()
     }
 
     glfwSwapBuffers(window);
-    Sleep(1);
   }
 
   par_shapes_free_mesh(shape.mesh);

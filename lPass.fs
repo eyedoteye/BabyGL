@@ -97,18 +97,21 @@ void main() {
   if(normal == vec3(0.f)) {
     fragmentColor = vec4(.4f, .6f, .2f, 1.f);
   } else {
-    vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
+    vec4 objectColor = texture(colorBuffer, textureCoords);
+    if(objectColor.a == 0.f)
+      discard;
+      
     vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
     vec3 viewDirection = normalize(viewPosition - fragmentPosition);
       
-      vec3 result = .1f * objectColor;
+      vec3 result = .1f * objectColor.rgb;
       for(int DirectionalLightIndex = 0;
           DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS;
           ++DirectionalLightIndex
       ) {
         result += computeDirectionalLightContribution(
             directionalLights[DirectionalLightIndex],
-            objectColor,
+            objectColor.rgb,
             normal,
             fragmentPosition,
             viewDirection);
@@ -119,7 +122,7 @@ void main() {
       ) {
         result += computePointLightContribution(
           pointLights[PointLightIndex],
-          objectColor,
+          objectColor.rgb,
           normal,
           fragmentPosition,
           viewDirection);

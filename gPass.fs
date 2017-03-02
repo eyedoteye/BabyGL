@@ -7,9 +7,9 @@ in vec2 textureCoords;
 
 layout (location = 0) out vec3 positionBuffer;
 layout (location = 1) out vec3 normalBuffer;
-layout (location = 2) out vec3 colorBuffer;
-layout (location = 3) out vec3 pointLightPositionBuffer;
-layout (location = 4) out vec3 pointLightColorBuffer; 
+layout (location = 2) out vec4 colorBuffer;
+layout (location = 3) out vec3 pointLightColorBuffer; 
+layout (location = 4) out int typeBuffer;
 
 uniform sampler2D perlinNoise;
 uniform int objectType;
@@ -23,8 +23,7 @@ void main()
   {
     case OBJECT_TYPE_POINTLIGHT:
     {
-      normalBuffer = vec3(0.f);
-      pointLightPositionBuffer = vertexPosition;
+      colorBuffer.a = 0.f;
       pointLightColorBuffer = vertexColor;
     } break;
     default:
@@ -39,7 +38,10 @@ void main()
       normalBuffer = normalize(vertexNormal + proceduralNormal / 2);
 
       positionBuffer = vertexPosition;
-      colorBuffer = vertexColor;
+      colorBuffer = vec4(vertexColor, 1.f);
+      
+      // Note: sets bg color, better method is needed.
+      pointLightColorBuffer = vec3(.4f, .6f, .2f);
     } break;
   }
 }
