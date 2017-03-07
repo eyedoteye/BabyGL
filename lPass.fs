@@ -24,7 +24,7 @@ struct PointLight
   float intensityDiffuse;
   float intensitySpecular;
 }; 
-#define MAX_POINT_LIGHTS 1
+#define MAX_POINT_LIGHTS 2
 layout (std140) uniform pointLightsUBO
 {
   PointLight pointLights[MAX_POINT_LIGHTS];  

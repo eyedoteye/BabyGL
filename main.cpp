@@ -408,7 +408,7 @@ int main()
   directionalLights[0].intensity.diffuse = 255 * 0.5f;
   directionalLights[0].intensity.specular = 255 * 0.5f;
 
-#define POINT_LIGHT_COUNT 1
+#define POINT_LIGHT_COUNT 2
   PointLight pointLights[POINT_LIGHT_COUNT] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
   pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
@@ -604,12 +604,12 @@ int main()
 
     { 
       glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
+      float buffer[25];
       for(int pointLightIndex = 0;
           pointLightIndex < POINT_LIGHT_COUNT;
           ++pointLightIndex)
       {
-        float buffer[13];
-        int offset = pointLightIndex * pointLightsUBOSize;
+        int offset = pointLightIndex * 12;
         int size = sizeof(float) * 4; //vec3 color (vec4 min)
        memcpy(buffer + offset,
            glm::value_ptr(pointLights[pointLightIndex].color),
@@ -632,10 +632,9 @@ int main()
         memcpy(buffer + offset,
           pointLights[pointLightIndex].intensities,
           size);
-        
-        glBufferSubData(GL_UNIFORM_BUFFER,
-          0, sizeof(buffer), buffer);
       }
+      glBufferSubData(GL_UNIFORM_BUFFER,
+        0, sizeof(buffer), buffer);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
   }    
 
