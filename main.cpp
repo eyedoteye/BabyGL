@@ -274,11 +274,7 @@ int main()
   debugObjectsShader.fragmentShaderSource = debugObjectsFragmentShaderSource;
   compileShaderObject(&debugObjectsShader);
   linkShaderObject(&debugObjectsShader);
-
-  glUseProgram(debugObjectsShader.shaderProgramID);
-  GLuint pointLightColorBufferLocation = glGetUniformLocation(debugObjectsShader.shaderProgramID, "colorBuffer");
-  glUniform1i(pointLightColorBufferLocation, 0);
-
+  
   ShaderObject guiShader = {};
   guiShader.vertexShaderSource = guiVertexShaderSource;
   guiShader.geometryShaderSource = guiGeometryShaderSource;
@@ -412,10 +408,38 @@ int main()
   directionalLights[0].intensity.diffuse = 255 * 0.5f;
   directionalLights[0].intensity.specular = 255 * 0.5f;
 
-#define NUM_POINT_LIGHTS 1
-  PointLight pointLights[NUM_POINT_LIGHTS] = {};
+#define POINT_LIGHT_COUNT 1
+  PointLight pointLights[POINT_LIGHT_COUNT] = {};
   pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
   pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
+  pointLights[1].position = glm::vec3(0.f, 1.f, -8.f);
+  pointLights[1].color = glm::vec3(1.f, 1.f, 1.f);
+
+  GLuint pointLightsUBOIndex = glGetUniformBlockIndex(
+      lPassShader.shaderProgramID,
+      "pointLightsUBO");
+  glUniformBlockBinding(
+      lPassShader.shaderProgramID,
+      pointLightsUBOIndex, 0);
+  
+  GLuint pointLightsUBO;
+  glGenBuffers(1, &pointLightsUBO);
+  int pointLightsUBOSize = sizeof(float) * 4 //vec3 color (vec4 min)
+                         + sizeof(float) * 4 //vec3 position (vec4 min)
+                         + sizeof(float)     //float attenuationLinear
+                         + sizeof(float)     //float attenuationQuadratic
+                         + sizeof(float)     //float intensityAmbient
+                         + sizeof(float)     //float intensityDiffuse
+                         + sizeof(float);    //float intensitySpecular
+  int alignment = sizeof(float) * 4;  //(vec4 min for structs)
+  pointLightsUBOSize = (pointLightsUBOSize + (alignment - 1))
+                     / alignment * alignment;
+  int totalsize = pointLightsUBOSize * POINT_LIGHT_COUNT;
+
+  glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
+  glBufferData(GL_UNIFORM_BUFFER, totalsize, NULL, GL_DYNAMIC_DRAW);
+  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  glBindBufferRange(GL_UNIFORM_BUFFER, 0, pointLightsUBO, 0, totalsize);
 
 #define OBJECT_TYPE_NONE 0
 #define OBJECT_TYPE_DEFAULT 1
@@ -476,7 +500,7 @@ int main()
     mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
     mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
 
-#define SLIDERSPEED 25 
+#define SLIDERSPEED (25 / 255.f)
     if(keysPressed[GLFW_KEY_TAB])
     {
       if(keysPressed[GLFW_MOD_SHIFT])
@@ -484,8 +508,8 @@ int main()
       else
         ++currentPointLightIndex;
       
-      currentPointLightIndex = (currentPointLightIndex + NUM_POINT_LIGHTS)
-                                  % NUM_POINT_LIGHTS;
+      currentPointLightIndex = (currentPointLightIndex + POINT_LIGHT_COUNT)
+                                  % POINT_LIGHT_COUNT;
       flattenPointLightSliders(&pointLights[currentPointLightIndex],
                                currentLightSliders);
     }
@@ -514,8 +538,8 @@ int main()
 
       if(*currentLightSlider < 0)
         *currentLightSlider = 0;
-      if(*currentLightSlider > 255)
-        *currentLightSlider = 255;
+      if(*currentLightSlider > 1.f)
+        *currentLightSlider = 1;
     }
 
 #define ROTATION_SPEED .2f
@@ -539,7 +563,16 @@ int main()
 
     drawRenderObject(&shape2, gPassShader.shaderProgramID);
     drawRenderObject(&shape, gPassShader.shaderProgramID);
-    drawPointLightDebugModel(lightShape, &pointLights[0], gPassShader.shaderProgramID);
+    if(debugMode)
+    {
+      for(int pointLightIndex = 0; pointLightIndex < POINT_LIGHT_COUNT; ++pointLightIndex)
+      {
+        drawPointLightDebugModel(
+          lightShape, 
+          &pointLights[pointLightIndex],
+          gPassShader.shaderProgramID);
+      }
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClearColor(.4f, .6f, .2f, 1.0f);
@@ -569,24 +602,61 @@ int main()
       glUniform1f(specularIntensityLocation, directionalLights[0].intensity.specular / 255.f);
     }
 
-    {
-      GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
-      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
-      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
-      glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
+    { 
+      glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
+      for(int pointLightIndex = 0;
+          pointLightIndex < POINT_LIGHT_COUNT;
+          ++pointLightIndex)
+      {
+        float buffer[13];
+        int offset = pointLightIndex * pointLightsUBOSize;
+        int size = sizeof(float) * 4; //vec3 color (vec4 min)
+       memcpy(buffer + offset,
+           glm::value_ptr(pointLights[pointLightIndex].color),
+           size);
 
-      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
-      glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
-      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
-      glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
-      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
-      glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
+        offset += 4;
+        //vec3 position (vec4 min)
+        memcpy(buffer + offset,
+          glm::value_ptr(pointLights[pointLightIndex].position),
+          size);
 
-      GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
-      glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
-      GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
-      glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
-    }
+        offset += 3;
+        size = sizeof(float) * 2; //float attenuations[2]
+        memcpy(buffer + offset,
+          pointLights[pointLightIndex].attenuations,
+          size);
+
+        offset += 2;
+        size = sizeof(float) * 3; //float intensities[3]
+        memcpy(buffer + offset,
+          pointLights[pointLightIndex].intensities,
+          size);
+        
+        glBufferSubData(GL_UNIFORM_BUFFER,
+          0, sizeof(buffer), buffer);
+      }
+      glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  }    
+
+//    {
+//      GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
+//      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
+//      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
+//      glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
+//
+//      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
+//      glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
+//      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
+//      glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
+//      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
+//      glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
+//
+//      GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
+//      glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
+//      GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
+//      glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
+//    }
 
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -606,11 +676,11 @@ int main()
       GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
       glUniform1f(onePixelLocation, 1.f / SCREEN_WIDTH * 2);
 
-      sliderTs[0] = pointLights[0].intensity.ambient / 255.f;
-      sliderTs[1] = pointLights[0].intensity.diffuse / 255.f;
-      sliderTs[2] = pointLights[0].intensity.specular / 255.f;
-      sliderTs[3] = pointLights[0].attenuation.linear / 255.f;
-      sliderTs[4] = pointLights[0].attenuation.quadratic / 255.f;
+      sliderTs[0] = *currentLightSliders[0];
+      sliderTs[1] = *currentLightSliders[1];
+      sliderTs[2] = *currentLightSliders[2];
+      sliderTs[3] = *currentLightSliders[3];
+      sliderTs[4] = *currentLightSliders[4];
     
       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
       glBufferData(GL_ARRAY_BUFFER,

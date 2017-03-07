@@ -12,8 +12,8 @@ struct DirectionalLight {
 };
 uniform DirectionalLight directionalLights[MAX_DIRECTIONAL_LIGHTS]; 
 
-#define MAX_POINT_LIGHTS 1
-struct PointLight {
+struct PointLight
+{
   vec3 color;
   vec3 position;
 
@@ -23,8 +23,12 @@ struct PointLight {
   float intensityAmbient;
   float intensityDiffuse;
   float intensitySpecular;
+}; 
+#define MAX_POINT_LIGHTS 1
+layout (std140) uniform pointLightsUBO
+{
+  PointLight pointLights[MAX_POINT_LIGHTS];  
 };
-uniform PointLight pointLights[MAX_POINT_LIGHTS];
 
 out vec4 fragmentColor;
 in vec2 textureCoords;
@@ -105,19 +109,19 @@ void main() {
       vec3 result = .1f * objectColor;
       for(int DirectionalLightIndex = 0;
           DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS;
-          ++DirectionalLightIndex
-      ) {
+          ++DirectionalLightIndex)
+      {
         result += computeDirectionalLightContribution(
-            directionalLights[DirectionalLightIndex],
-            objectColor,
-            normal,
-            fragmentPosition,
-            viewDirection);
+          directionalLights[DirectionalLightIndex],
+          objectColor,
+          normal,
+          fragmentPosition,
+          viewDirection);
       }
       for(int PointLightIndex = 0;
           PointLightIndex < MAX_POINT_LIGHTS;
-          ++PointLightIndex
-      ) {
+          ++PointLightIndex)
+      {
         result += computePointLightContribution(
           pointLights[PointLightIndex],
           objectColor,

@@ -1,6 +1,7 @@
 # BabyGL
 2/1/2017 12:52 AM: I have discovered.. ~spooky sounds~.  
 
+\` Toggles Debug Mode
 Tab, Shift+Tab is Cycle Through Point Lights
 1-5 is Select Slider    
 Q,E is Move Slider  
