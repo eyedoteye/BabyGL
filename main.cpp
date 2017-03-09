@@ -604,12 +604,12 @@ int main()
 
     { 
       glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
-      float buffer[25];
+      float buffer[26];
       for(int pointLightIndex = 0;
           pointLightIndex < POINT_LIGHT_COUNT;
           ++pointLightIndex)
       {
-        int offset = pointLightIndex * 12;
+        int offset = pointLightIndex * 13;
         int size = sizeof(float) * 4; //vec3 color (vec4 min)
        memcpy(buffer + offset,
            glm::value_ptr(pointLights[pointLightIndex].color),
@@ -666,6 +666,18 @@ int main()
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
 
+      //Todo: Group this better with shader?
+      GLuint discardNonSpheresIndex = glGetSubroutineIndex(
+          debugObjectsShader.shaderProgramID,
+          GL_FRAGMENT_SHADER, "discardNonSpheres");
+      GLuint blurHorizontalIndex = glGetSubroutineIndex(
+          debugObjectsShader.shaderProgramID,
+          GL_FRAGMENT_SHADER, "blurHorizontal");
+      GLuint blurVerticalIndex = glGetSubroutineIndex(
+          debugObjectsShader.shaderProgramID,
+          GL_FRAGMENT_SHADER, "blurVertical");
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
+      
       glBindVertexArray(quadVAO);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
