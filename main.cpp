@@ -344,13 +344,32 @@ int main()
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     printf("Framebuffer is broken!");
       
-  GLuint pointLightFBO;
-  glGenFramebuffers(1, &pointLightFBO);
-  glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBO);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-      GL_TEXTURE_2D, pointLightColorBufferID, 0);
-  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    printf("Framebuffer is broken!");
+  GLuint pointLightFBOs[2];
+  glGenFramebuffers(2, pointLightFBOs);
+
+  GLuint pointLightBlurBufferIDs[2];
+  glGenTextures(2, pointLightBlurBufferIDs);
+  for(int pointLightBlurBufferIndex = 0;
+      pointLightBlurBufferIndex < 2;
+      ++pointLightBlurBufferIndex)
+  {
+    glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[pointLightBlurBufferIndex]);
+    glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[pointLightBlurBufferIndex]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
+                 GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, pointLightBlurBufferIDs[pointLightBlurBufferIndex], 0);
+    GLuint attachment[1] = { GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(1, attachment);
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+      printf("Framebuffer is broken!");
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   GLuint quadVAO;
   GLuint quadVBO;
@@ -672,37 +691,50 @@ int main()
 
     if(debugMode)
     {
+      //Note: Now I'm Just str8 Copying LearnOpenGL
+   //   GLboolean horizontal = true, first_iteration = true;
+
+   //   for(int iteration = 0; iteration < 1; ++iteration)
+   //   {
+   //     glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[horizontal]);
+   //     glActiveTexture(GL_TEXTURE0);
+   //     glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[horizontal]);
+   //     glBindTexture(GL_TEXTURE_2D,
+   //        first_iteration ? pointLightColorBufferID : pointLightBlurBufferIDs[!horizontal]);
+   //     glBindVertexArray(quadVAO);
+   //     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+   //     horizontal = !horizontal;
+   //     first_iteration = false;
+   //   }
+   
       glUseProgram(debugObjectsShader.shaderProgramID);
 
       //Todo: Group this better with shader?
-      GLuint discardNonSpheresIndex = glGetSubroutineIndex(
+      //Todo: Pull this out of the loop @_@
+      static GLuint discardNonSpheresIndex = glGetSubroutineIndex(
           debugObjectsShader.shaderProgramID,
           GL_FRAGMENT_SHADER, "discardNonSpheres");
-      GLuint blurHorizontalIndex = glGetSubroutineIndex(
+      static GLuint blurIndices[2];
+      blurIndices[0] = glGetSubroutineIndex(
           debugObjectsShader.shaderProgramID,
           GL_FRAGMENT_SHADER, "blurHorizontal");
-      GLuint blurVerticalIndex = glGetSubroutineIndex(
+      blurIndices[1] = glGetSubroutineIndex(
           debugObjectsShader.shaderProgramID,
           GL_FRAGMENT_SHADER, "blurVertical");
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
-      
-      glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBO);
+   
+      glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[0]);
       glActiveTexture(GL_TEXTURE0);
+     // glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[0]);
       glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
       glBindVertexArray(quadVAO);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-      
-      for(int iteration = 0; iteration < 10; ++iteration)
-      {
-        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurHorizontalIndex);
-        glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-      }
      
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
+      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[0]);
+    //  glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID); 
       glBindVertexArray(quadVAO);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

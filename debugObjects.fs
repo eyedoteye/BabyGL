@@ -1,7 +1,7 @@
 R""(
 #version 400 core
 
-out vec4 fragmentColor;
+layout (location = 0) out vec4 fragmentColor;
 in vec2 textureCoords;
 
 uniform sampler2D colorBuffer;
