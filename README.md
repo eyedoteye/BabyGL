@@ -15,6 +15,6 @@ Sliders:
 5. QuadraticAttenuation 
   
 2/26/2017 9:16PM Currently undergoing some clean-up.  
-2/28/2017 1:28AM Some laggy frames have been popping up. Investigation needed.
+2/28/2017 1:28AM Some laggy frames have been popping up. Investigation needed.  
 3/16/2017 7:43PM Not being able to get a debugger working caused a huge
 motivational slump, thankfully apitrace came to save the day!
