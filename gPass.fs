@@ -27,7 +27,6 @@ void main()
     case OBJECT_TYPE_POINTLIGHT:
     {
       pointLightColorBuffer = vec4(vertexColor, 1.f);
-      normalBuffer = normalize(vertexNormal);
     } break;
     case OBJECT_TYPE_DEFAULT:
     {

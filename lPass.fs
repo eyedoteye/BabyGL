@@ -137,7 +137,7 @@ subroutine(debugRoutine) vec4 debugOn()
 {
   vec3 normal = texture(normalBuffer, textureCoords).rgb;
   vec4 lightColor = texture(lightColorBuffer, textureCoords);          
-  if(normal == vec3(0.f))
+  if(normal == vec3(0.f) && lightColor.a == 0.f)
     discard;
 
   vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
@@ -146,7 +146,18 @@ subroutine(debugRoutine) vec4 debugOn()
     
   vec4 sceneColor = computeColor(normal, objectColor, fragmentPosition, viewDirection);
 
-  return sceneColor + lightColor;
+  vec4 finalColor = vec4(1.f);
+
+  //Note: This is a special case that exists because I'm using a
+  //2D background. In the future, actual blending may be needed if a skybox is
+  //used.
+  if(normal == vec3(0.f) && lightColor.a < 1.f)
+    finalColor.rgb = vec3(.4f, .6f, .2f) * (1 - lightColor.a)
+                   + lightColor.rgb;
+  else
+    finalColor.rgb = sceneColor.rgb * (1 - lightColor.a)
+                   + lightColor.rgb; 
+  return finalColor; 
 }
 
 subroutine(debugRoutine) vec4 debugOff()

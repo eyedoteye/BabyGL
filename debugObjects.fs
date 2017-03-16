@@ -20,11 +20,11 @@ vec4 gaussianBlur(vec4 originColor, vec2 texelSize)
   {
     result += texture(colorBuffer,
                       textureCoords + vec2(texelSize.x * weightIndex,
-                                           texelSize.y * weightIndex)).rgb
+                                           texelSize.y * weightIndex))
                       * weight[weightIndex];
     result += texture(colorBuffer,
                       textureCoords - vec2(texelSize.x * weightIndex,
-                                           texelSize.y * weightIndex)).rgb
+                                           texelSize.y * weightIndex))
                       * weight[weightIndex];
   }
   return result;
