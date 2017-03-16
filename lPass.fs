@@ -149,8 +149,8 @@ subroutine(debugRoutine) vec4 debugOn()
   vec4 finalColor = vec4(1.f);
 
   //Note: This is a special case that exists because I'm using a
-  //2D background. In the future, actual blending may be needed if a skybox is
-  //used.
+  //clear color as the background.
+  //Todo: Have the clear color passed in.
   if(normal == vec3(0.f) && lightColor.a < 1.f)
     finalColor.rgb = vec3(.4f, .6f, .2f) * (1 - lightColor.a)
                    + lightColor.rgb;

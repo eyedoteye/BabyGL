@@ -719,6 +719,7 @@ int main()
 
     if(debugMode)
     {
+      glClear(GL_DEPTH_BUFFER_BIT);
       glUseProgram(guiShader.shaderProgramID);
 
       GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
