@@ -19,12 +19,15 @@ uniform int objectType;
 
 void main()
 {
+  pointLightColorBuffer = vec4(0.f);
+  colorBuffer = vec3(0.f);
+  normalBuffer = vec3(0.f);
   switch(objectType)
   {
     case OBJECT_TYPE_POINTLIGHT:
     {
-      normalBuffer = vec3(0.f);
       pointLightColorBuffer = vec4(vertexColor, 1.f);
+      normalBuffer = normalize(vertexNormal);
     } break;
     case OBJECT_TYPE_DEFAULT:
     {
@@ -39,13 +42,6 @@ void main()
 
       positionBuffer = vertexPosition;
       colorBuffer = vertexColor;
-      
-      // Note: sets bg color, better method is needed.
-      pointLightColorBuffer.a = 0;
-    } break;
-    default:
-    {
-      normalBuffer = vec3(0.f);
     } break;
   }
 }

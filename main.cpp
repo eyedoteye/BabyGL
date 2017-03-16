@@ -665,30 +665,7 @@ int main()
       glBufferSubData(GL_UNIFORM_BUFFER,
         0, sizeof(buffer), buffer);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
-  }    
-
-//    {
-//      GLint lightPositionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].position");
-//      glUniform3fv(lightPositionLocation, 1, glm::value_ptr(pointLights[0].position));
-//      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].color");
-//      glUniform3fv(lightColorLocation, 1, glm::value_ptr(pointLights[0].color));
-//
-//      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityAmbient");
-//      glUniform1f(ambientIntensityLocation, pointLights[0].intensity.ambient / 255.f);
-//      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensityDiffuse");
-//      glUniform1f(diffuseIntensityLocation, pointLights[0].intensity.diffuse / 255.f);
-//      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].intensitySpecular");
-//      glUniform1f(specularIntensityLocation, pointLights[0].intensity.specular / 255.f);
-//
-//      GLint linearAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationLinear");
-//      glUniform1f(linearAttenuationLocation, pointLights[0].attenuation.linear / 255.f);
-//      GLint quadraticAttenuationLocation = glGetUniformLocation(lPassShader.shaderProgramID, "pointLights[0].attenuationQuadratic");
-//      glUniform1f(quadraticAttenuationLocation, pointLights[0].attenuation.quadratic / 255.f);
-//    }
-
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
+    }    
     if(debugMode)
     {
       glUseProgram(debugObjectsShader.shaderProgramID);
@@ -696,19 +673,18 @@ int main()
       //Todo: Group this better with shader?
       //Todo: Pull this out of the loop @_@
       static GLuint discardNonSpheresIndex = glGetSubroutineIndex(
-          debugObjectsShader.shaderProgramID,
-          GL_FRAGMENT_SHADER, "discardNonSpheres");
+        debugObjectsShader.shaderProgramID,
+        GL_FRAGMENT_SHADER, "discardNonSpheres");
       static GLuint blurIndices[2];
       blurIndices[0] = glGetSubroutineIndex(
-          debugObjectsShader.shaderProgramID,
-          GL_FRAGMENT_SHADER, "blurHorizontal");
+        debugObjectsShader.shaderProgramID,
+        GL_FRAGMENT_SHADER, "blurHorizontal");
       blurIndices[1] = glGetSubroutineIndex(
-          debugObjectsShader.shaderProgramID,
-          GL_FRAGMENT_SHADER, "blurVertical");
-   
+        debugObjectsShader.shaderProgramID,
+        GL_FRAGMENT_SHADER, "blurVertical");
+      
       //Note: Now I'm Just str8 Copying LearnOpenGL
       GLboolean vertical = true;
-
       for(int iteration = 0; iteration < 10; ++iteration)
       {
         glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[vertical]);
@@ -720,24 +696,29 @@ int main()
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         vertical = !vertical;
       }
-   
-   //   glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[0]);
-   //   glActiveTexture(GL_TEXTURE0);
-   //  // glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
-   //   glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[0]);
-   //   glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
-   //   glBindVertexArray(quadVAO);
-   //   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-     
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &discardNonSpheresIndex);  
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[0]);
-    //  glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID); 
-      glBindVertexArray(quadVAO);
-      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-      glClear(GL_DEPTH_BUFFER_BIT);
+      //Todo: Pull this out of the loop
+      glUseProgram(lPassShader.shaderProgramID);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      static GLuint debugOnSubroutineIndex =
+      glGetSubroutineIndex(lPassShader.shaderProgramID,
+                           GL_FRAGMENT_SHADER, "debugOn");
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOnSubroutineIndex);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[!vertical]);
+    }
+    else
+    {
+      static GLuint debugOffSubroutineIndex =
+        glGetSubroutineIndex(lPassShader.shaderProgramID,
+                             GL_FRAGMENT_SHADER, "debugOff");
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOffSubroutineIndex);
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    if(debugMode)
+    {
       glUseProgram(guiShader.shaderProgramID);
 
       GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
@@ -756,8 +737,8 @@ int main()
                    GL_DYNAMIC_DRAW);
 
       for(int sliderIndex = 0;
-      sliderIndex < 5;
-      ++sliderIndex)
+        sliderIndex < 5;
+        ++sliderIndex)
       {
           sliderIsSelecteds[sliderIndex] = 0;  
       }
@@ -765,9 +746,9 @@ int main()
 
       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboIsSelecteds);
       glBufferData(GL_ARRAY_BUFFER,
-                   sizeof(int) * 5,
-                   sliderGUI.isSelecteds,
-                   GL_DYNAMIC_DRAW);
+                 sizeof(int) * 5,
+                 sliderGUI.isSelecteds,
+                 GL_DYNAMIC_DRAW);
 
       glBindVertexArray(sliderGUI.VAO);
       glDrawArrays(GL_POINTS, 0, 5);

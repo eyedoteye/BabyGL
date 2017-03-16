@@ -95,45 +95,75 @@ highp float rand(vec2 co) {
   return fract(sin(sn) * c);
 }
 
-void main() {
+vec4 computeColor(
+  vec3 normal,
+  vec3 objectColor,
+  vec3 fragmentPosition,
+  vec3 viewDirection)
+{
+    vec3 result = .1f * objectColor;
+    for(int DirectionalLightIndex = 0;
+        DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS;
+        ++DirectionalLightIndex)
+    {
+      result += computeDirectionalLightContribution(
+        directionalLights[DirectionalLightIndex],
+        objectColor,
+        normal,
+        fragmentPosition,
+        viewDirection);
+    }
+    for(int PointLightIndex = 0;
+        PointLightIndex < MAX_POINT_LIGHTS;
+        ++PointLightIndex)
+    {
+      result += computePointLightContribution(
+        pointLights[PointLightIndex],
+        objectColor,
+        normal,
+        fragmentPosition,
+        viewDirection);
+    }
+
+    return vec4(result + mix(-0.5f/255, 0.5f/255,
+                rand(textureCoords)), 1.f);
+}
+
+subroutine vec4 debugRoutine();
+subroutine uniform debugRoutine currentRoutine;
+uniform sampler2D lightColorBuffer;
+
+subroutine(debugRoutine) vec4 debugOn()
+{
   vec3 normal = texture(normalBuffer, textureCoords).rgb;
-
+  vec4 lightColor = texture(lightColorBuffer, textureCoords);          
   if(normal == vec3(0.f))
-  {
     discard;
-  } else {
-    vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
-    vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
-    vec3 viewDirection = normalize(viewPosition - fragmentPosition);
-      
-      vec3 result = .1f * objectColor;
-      for(int DirectionalLightIndex = 0;
-          DirectionalLightIndex < MAX_DIRECTIONAL_LIGHTS;
-          ++DirectionalLightIndex)
-      {
-        result += computeDirectionalLightContribution(
-          directionalLights[DirectionalLightIndex],
-          objectColor,
-          normal,
-          fragmentPosition,
-          viewDirection);
-      }
-      for(int PointLightIndex = 0;
-          PointLightIndex < MAX_POINT_LIGHTS;
-          ++PointLightIndex)
-      {
-        result += computePointLightContribution(
-          pointLights[PointLightIndex],
-          objectColor,
-          normal,
-          fragmentPosition,
-          viewDirection);
-      }
 
-      fragmentColor = 
-        vec4(result + mix(-0.5f/255, 0.5f/255,
-                          rand(textureCoords)),
-             1.f);
-  }
+  vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
+  vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
+  vec3 viewDirection = normalize(viewPosition - fragmentPosition);
+    
+  vec4 sceneColor = computeColor(normal, objectColor, fragmentPosition, viewDirection);
+
+  return sceneColor + lightColor;
+}
+
+subroutine(debugRoutine) vec4 debugOff()
+{                    
+  vec3 normal = texture(normalBuffer, textureCoords).rgb;
+  if(normal == vec3(0.f))
+    discard;
+
+  vec3 objectColor = texture(colorBuffer, textureCoords).rgb;
+  vec3 fragmentPosition = texture(positionBuffer, textureCoords).rgb;
+  vec3 viewDirection = normalize(viewPosition - fragmentPosition);
+    
+  return computeColor(normal, objectColor, fragmentPosition, viewDirection);
+}
+
+
+void main() {
+  fragmentColor = currentRoutine();
 }
 )"";
