@@ -1,9 +1,9 @@
 # BabyGL
 2/1/2017 12:52 AM: I have discovered.. ~spooky sounds~.  
-
-\` Toggles Debug Mode
-Tab, Shift+Tab is Cycle Through Point Lights
-1-5 is Select Slider    
+  
+Toggles Debug Mode  
+Tab, Shift+Tab is Cycle Through Point Lights  
+1-5 is Select Slider  
 Q,E is Move Slider  
 W,A,S,D,Shift,Space is Move  
   
@@ -16,3 +16,5 @@ Sliders:
   
 2/26/2017 9:16PM Currently undergoing some clean-up.  
 2/28/2017 1:28AM Some laggy frames have been popping up. Investigation needed.
+3/16/2017 7:43PM Not being able to get a debugger working caused a huge
+motivational slump, thankfully apitrace came to save the day!
