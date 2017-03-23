@@ -80,9 +80,21 @@ void flattenPointLightSliders(
 }
 
 void drawPointLightDebugModel(
-    RenderObject debugModel,
-    PointLight* pointLight,
-    GLuint shaderProgramID)
+  RenderObject debugModel,
+  PointLight* pointLight,
+  float scale,
+  GLuint shaderProgramID)
+{
+  debugModel.model = glm::translate(debugModel.model, pointLight->position);
+  debugModel.model = glm::scale(debugModel.model, glm::vec3(scale, scale, scale));
+  debugModel.color = pointLight->color;
+  drawRenderObject(&debugModel, shaderProgramID);
+}
+
+void drawPointLightDebugModel(
+  RenderObject debugModel,
+  PointLight* pointLight,
+  GLuint shaderProgramID)
 {
   debugModel.model = glm::translate(debugModel.model, pointLight->position);
   debugModel.color = pointLight->color;
@@ -236,6 +248,10 @@ int main()
     #include "debugObjects.vs"
   GLchar* debugObjectsFragmentShaderSource =
     #include "debugObjects.fs"
+  GLchar* pointLightOutlineVertexShaderSource =
+    #include "pointLightOutline.vs"
+  GLchar* pointLightOutlineFragmentShaderSource =
+    #include "pointLightOutline.fs"
 
   GLchar* guiVertexShaderSource =
     #include "gui.vs"
@@ -275,6 +291,12 @@ int main()
   compileShaderObject(&debugObjectsShader);
   linkShaderObject(&debugObjectsShader);
   
+  ShaderObject pointLightOutlineShader = {};
+  pointLightOutlineShader.vertexShaderSource = pointLightOutlineVertexShaderSource;
+  pointLightOutlineShader.fragmentShaderSource = pointLightOutlineFragmentShaderSource;
+  compileShaderObject(&pointLightOutlineShader);
+  linkShaderObject(&pointLightOutlineShader);
+
   ShaderObject guiShader = {};
   guiShader.vertexShaderSource = guiVertexShaderSource;
   guiShader.geometryShaderSource = guiGeometryShaderSource;
@@ -343,7 +365,7 @@ int main()
                             GL_RENDERBUFFER, rboDepth);
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     printf("Framebuffer is broken!");
-      
+  
   GLuint pointLightFBOs[2];
   glGenFramebuffers(2, pointLightFBOs);
 
@@ -371,6 +393,34 @@ int main()
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+  //Note: framebuffer for outline
+  GLuint pointLightOutlineFBO;
+  glGenFramebuffers(1, &pointLightOutlineFBO);
+
+  GLuint pointLightOutlineColorBufferID;
+  glGenTextures(1, &pointLightOutlineColorBufferID);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, pointLightOutlineFBO);
+  glBindTexture(GL_TEXTURE_2D, pointLightOutlineColorBufferID);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
+               GL_RGB, GL_FLOAT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                         GL_TEXTURE_2D, pointLightOutlineColorBufferID, 0);
+  
+  GLuint pointLightOutlineStencilBufferID;
+  glGenRenderbuffers(1, &pointLightOutlineStencilBufferID);
+  glBindRenderbuffer(GL_RENDERBUFFER, pointLightOutlineStencilBufferID);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, width, height);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, pointLightOutlineStencilBufferID);
+  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    printf("Framebuffer is broken!");
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  
   GLuint quadVAO;
   GLuint quadVBO;
   GLfloat quadVertices[] = {
@@ -719,7 +769,42 @@ int main()
 
     if(debugMode)
     {
+      //Todo: Put the stencil in here 
+      glEnable(GL_STENCIL_TEST);
+      glBindFramebuffer(GL_FRAMEBUFFER, pointLightOutlineFBO);
+      glUseProgram(pointLightOutlineShader.shaderProgramID);
+      projectionLocation = glGetUniformLocation(pointLightOutlineShader.shaderProgramID, "projection");
+      glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(camera.projection));
+      viewLocation = glGetUniformLocation(pointLightOutlineShader.shaderProgramID, "view");
+      glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(camera.view));
+      glStencilFunc(GL_ALWAYS, 1, 0xFF);
+      glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+      glStencilMask(0xFF);
+      glDepthMask(GL_FALSE);
+      glClearColor(1.f, 1.f, 1.f, 1.f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+      drawPointLightDebugModel(
+          lightShape,
+          &pointLights[currentPointLightIndex],
+          0.8f,
+          pointLightOutlineShader.shaderProgramID); 
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, pointLightOutlineFBO);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+      glBlitFramebuffer(0, 0, width, height,
+                        0, 0, width, height,
+                        GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+      glStencilMask(0x00);
+      glDepthMask(GL_TRUE);
       glClear(GL_DEPTH_BUFFER_BIT);
+      drawPointLightDebugModel(
+          lightShape,
+          &pointLights[currentPointLightIndex],
+          pointLightOutlineShader.shaderProgramID);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+      glDisable(GL_STENCIL_TEST);
       glUseProgram(guiShader.shaderProgramID);
 
       GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
