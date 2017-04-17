@@ -252,7 +252,7 @@ int main()
     #include "pointLightOutline.vs"
   GLchar* pointLightOutlineFragmentShaderSource =
     #include "pointLightOutline.fs"
-
+  
   GLchar* guiVertexShaderSource =
     #include "gui.vs"
   GLchar* guiGeometryShaderSource =
@@ -277,12 +277,24 @@ int main()
   linkShaderObject(&lPassShader);
 
   glUseProgram(lPassShader.shaderProgramID);
-  GLuint positionBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "positionBuffer");
+
+  GLuint positionBufferLocation = glGetUniformLocation(
+    lPassShader.shaderProgramID, "positionBuffer");
   glUniform1i(positionBufferLocation, 0);
-  GLuint normalBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "normalBuffer");
+  GLuint normalBufferLocation = glGetUniformLocation(
+    lPassShader.shaderProgramID, "normalBuffer");
   glUniform1i(normalBufferLocation, 1);
-  GLuint colorBufferLocation = glGetUniformLocation(lPassShader.shaderProgramID, "colorBuffer");
+  GLuint colorBufferLocation = glGetUniformLocation(
+    lPassShader.shaderProgramID, "colorBuffer");
   glUniform1i(colorBufferLocation, 2);
+
+  GLuint debugOnSubroutineIndex = glGetSubroutineIndex(
+    lPassShader.shaderProgramID,
+    GL_FRAGMENT_SHADER, "debugOn");
+  GLuint debugOffSubroutineIndex = glGetSubroutineIndex(
+    lPassShader.shaderProgramID,
+    GL_FRAGMENT_SHADER, "debugOff");
+
   glUseProgram(0);
 
   ShaderObject debugObjectsShader = {};
@@ -290,7 +302,23 @@ int main()
   debugObjectsShader.fragmentShaderSource = debugObjectsFragmentShaderSource;
   compileShaderObject(&debugObjectsShader);
   linkShaderObject(&debugObjectsShader);
+ 
+  glUseProgram(debugObjectsShader.shaderProgramID);
+
+  GLuint discardNonSpheresIndex = glGetSubroutineIndex(
+    debugObjectsShader.shaderProgramID,
+    GL_FRAGMENT_SHADER, "discardNonSpheres");
+
+  GLuint blurIndices[2];
+  blurIndices[0] = glGetSubroutineIndex(
+    debugObjectsShader.shaderProgramID,
+    GL_FRAGMENT_SHADER, "blurHorizontal");
+  blurIndices[1] = glGetSubroutineIndex(
+    debugObjectsShader.shaderProgramID,
+    GL_FRAGMENT_SHADER, "blurVertical");
   
+  glUseProgram(0);
+
   ShaderObject pointLightOutlineShader = {};
   pointLightOutlineShader.vertexShaderSource = pointLightOutlineVertexShaderSource;
   pointLightOutlineShader.fragmentShaderSource = pointLightOutlineFragmentShaderSource;
@@ -716,25 +744,13 @@ int main()
         0, sizeof(buffer), buffer);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }    
-    if(debugMode)
+
+    if(debugMode) //The bug is in here
     {
       glUseProgram(debugObjectsShader.shaderProgramID);
-
-      //Todo: Group this better with shader?
-      //Todo: Pull this out of the loop @_@
-      static GLuint discardNonSpheresIndex = glGetSubroutineIndex(
-        debugObjectsShader.shaderProgramID,
-        GL_FRAGMENT_SHADER, "discardNonSpheres");
-      static GLuint blurIndices[2];
-      blurIndices[0] = glGetSubroutineIndex(
-        debugObjectsShader.shaderProgramID,
-        GL_FRAGMENT_SHADER, "blurHorizontal");
-      blurIndices[1] = glGetSubroutineIndex(
-        debugObjectsShader.shaderProgramID,
-        GL_FRAGMENT_SHADER, "blurVertical");
       
       //Note: Now I'm Just str8 Copying LearnOpenGL
-      GLboolean vertical = true;
+      GLboolean vertical = false;
       for(int iteration = 0; iteration < 10; ++iteration)
       {
         glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[vertical]);
@@ -747,21 +763,14 @@ int main()
         vertical = !vertical;
       }
 
-      //Todo: Pull this out of the loop
       glUseProgram(lPassShader.shaderProgramID);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      static GLuint debugOnSubroutineIndex =
-      glGetSubroutineIndex(lPassShader.shaderProgramID,
-                           GL_FRAGMENT_SHADER, "debugOn");
       glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOnSubroutineIndex);
       glActiveTexture(GL_TEXTURE3);
       glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[!vertical]);
     }
     else
     {
-      static GLuint debugOffSubroutineIndex =
-        glGetSubroutineIndex(lPassShader.shaderProgramID,
-                             GL_FRAGMENT_SHADER, "debugOff");
       glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOffSubroutineIndex);
     }
     glBindVertexArray(quadVAO);
