@@ -137,6 +137,7 @@ subroutine(debugRoutine) vec4 debugOn()
 {
   vec3 normal = texture(normalBuffer, textureCoords).rgb;
   vec4 lightColor = texture(lightColorBuffer, textureCoords);          
+
   if(normal == vec3(0.f) && lightColor.a == 0.f)
     discard;
 

@@ -287,6 +287,9 @@ int main()
   GLuint colorBufferLocation = glGetUniformLocation(
     lPassShader.shaderProgramID, "colorBuffer");
   glUniform1i(colorBufferLocation, 2);
+  GLuint pointLightColorBufferLocation = glGetUniformLocation(
+      lPassShader.shaderProgramID, "lightColorBuffer");
+  glUniform1i(pointLightColorBufferLocation, 3);
 
   GLuint debugOnSubroutineIndex = glGetSubroutineIndex(
     lPassShader.shaderProgramID,
@@ -372,7 +375,7 @@ int main()
   glGenTextures(1, &pointLightColorBufferID);
   glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
+               GL_RGBA, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -394,6 +397,8 @@ int main()
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     printf("Framebuffer is broken!");
   
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
   GLuint pointLightFBOs[2];
   glGenFramebuffers(2, pointLightFBOs);
 
@@ -406,7 +411,7 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[pointLightBlurBufferIndex]);
     glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[pointLightBlurBufferIndex]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
-                 GL_RGB, GL_FLOAT, NULL);
+                 GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -684,6 +689,29 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClearColor(.4f, .6f, .2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    //Note: put in a better place
+    GLboolean vertical = false;
+    if(debugMode)
+    {
+      glUseProgram(debugObjectsShader.shaderProgramID);
+      
+      //Note: This bloom method is taken from learnopengl.com 
+      for(int iteration = 0; iteration < 10; ++iteration)
+      {
+        glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[vertical]);
+        glActiveTexture(GL_TEXTURE0);
+        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[vertical]);
+        glBindTexture(GL_TEXTURE_2D,
+           iteration == 0 ?
+           pointLightColorBufferID : pointLightBlurBufferIDs[!vertical]);
+        glBindVertexArray(quadVAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        vertical = !vertical;
+      }
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
     glUseProgram(lPassShader.shaderProgramID);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, positionBufferID);
@@ -691,6 +719,17 @@ int main()
     glBindTexture(GL_TEXTURE_2D, normalBufferID);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, colorBufferID);
+
+    if(debugMode)
+    {
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[!vertical]);
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOnSubroutineIndex);
+    }
+    else
+    {
+      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOffSubroutineIndex);
+    }
 
     GLint viewPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "viewPosition");
     glUniform3fv(viewPositionLocation, 1, glm::value_ptr(camera.position));
@@ -745,34 +784,6 @@ int main()
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }    
 
-    if(debugMode) //The bug is in here
-    {
-      glUseProgram(debugObjectsShader.shaderProgramID);
-      
-      //Note: Now I'm Just str8 Copying LearnOpenGL
-      GLboolean vertical = false;
-      for(int iteration = 0; iteration < 10; ++iteration)
-      {
-        glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[vertical]);
-        glActiveTexture(GL_TEXTURE0);
-        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[vertical]);
-        glBindTexture(GL_TEXTURE_2D,
-           iteration == 0 ? pointLightColorBufferID : pointLightBlurBufferIDs[!vertical]);
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        vertical = !vertical;
-      }
-
-      glUseProgram(lPassShader.shaderProgramID);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOnSubroutineIndex);
-      glActiveTexture(GL_TEXTURE3);
-      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[!vertical]);
-    }
-    else
-    {
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOffSubroutineIndex);
-    }
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
