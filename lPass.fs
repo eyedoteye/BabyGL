@@ -14,8 +14,10 @@ uniform DirectionalLight directionalLights[MAX_DIRECTIONAL_LIGHTS];
 
 struct PointLight
 {
-  vec3 color;
-  vec3 position;
+  //Note: The following are actually vec3s,
+  //but are declared as vec4 to reduce (std140) UBO bugs.
+  vec4 color;      
+  vec4 position;
 
   float attenuationLinear;
   float attenuationQuadratic;
@@ -65,17 +67,17 @@ vec3 computePointLightContribution(
   vec3 fragmentPosition,
   vec3 viewDirection
 ) {
-  vec3 lightDirection = normalize(pointLight.position - fragmentPosition);
+  vec3 lightDirection = normalize(pointLight.position.xyz - fragmentPosition);
   vec3 reflectDirection = reflect(-lightDirection, normal);
 
   vec3 ambient = pointLight.intensityAmbient * objectColor;
-  vec3 diffuse = pointLight.intensityDiffuse * pointLight.color
+  vec3 diffuse = pointLight.intensityDiffuse * pointLight.color.rgb
                * max(dot(normal, lightDirection), 0.f) * objectColor;
-  vec3 specular = pointLight.intensitySpecular * pointLight.color
+  vec3 specular = pointLight.intensitySpecular * pointLight.color.rgb
                 * pow(max(dot(viewDirection, reflectDirection), 0.f), 64);
                 //Currently, no specular map.
 
-  float distance = length(pointLight.position - fragmentPosition);
+  float distance = length(pointLight.position.xyz - fragmentPosition);
   float attenuation = 1.f / (1.f
                                + pointLight.attenuationLinear * distance
                                + pointLight.attenuationQuadratic * distance * distance);

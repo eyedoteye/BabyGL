@@ -536,13 +536,14 @@ int main()
   
   GLuint pointLightsUBO;
   glGenBuffers(1, &pointLightsUBO);
-  int pointLightsUBOSize = sizeof(float) * 4 //vec3 color (vec4 min)
-                         + sizeof(float) * 4 //vec3 position (vec4 min)
-                         + sizeof(float)     //float attenuationLinear
-                         + sizeof(float)     //float attenuationQuadratic
-                         + sizeof(float)     //float intensityAmbient
-                         + sizeof(float)     //float intensityDiffuse
-                         + sizeof(float);    //float intensitySpecular
+  int pointLightsUBOSize = // Alignment Offset Description
+    sizeof(float) * 4      // 16        0      vec3 color (vec4 min)
+    + sizeof(float) * 4    // 16        16     vec3 position (vec4 min)
+    + sizeof(float)        // 4         32     float attenuationLinear
+    + sizeof(float)        // 4         36     float attenuationQuadratic
+    + sizeof(float)        // 4         40     float intensityAmbient
+    + sizeof(float)        // 4         44     float intensityDiffuse
+    + sizeof(float);       // 4         48     float intensitySpecular
   int alignment = sizeof(float) * 4;  //(vec4 min for structs)
   pointLightsUBOSize = (pointLightsUBOSize + (alignment - 1))
                      / alignment * alignment;
@@ -750,34 +751,36 @@ int main()
 
     { 
       glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
-      float buffer[26];
+      float buffer[32];
+      int offset = 0;
       for(int pointLightIndex = 0;
           pointLightIndex < POINT_LIGHT_COUNT;
           ++pointLightIndex)
       {
-        int offset = pointLightIndex * 13;
         int size = sizeof(float) * 4; //vec3 color (vec4 min)
        memcpy(buffer + offset,
            glm::value_ptr(pointLights[pointLightIndex].color),
            size);
-
         offset += 4;
+
         //vec3 position (vec4 min)
         memcpy(buffer + offset,
           glm::value_ptr(pointLights[pointLightIndex].position),
           size);
+        offset += 4;
 
-        offset += 3;
         size = sizeof(float) * 2; //float attenuations[2]
         memcpy(buffer + offset,
           pointLights[pointLightIndex].attenuations,
           size);
-
         offset += 2;
+
         size = sizeof(float) * 3; //float intensities[3]
         memcpy(buffer + offset,
           pointLights[pointLightIndex].intensities,
           size);
+        offset += 3;
+        offset += 3;
       }
       glBufferSubData(GL_UNIFORM_BUFFER,
         0, sizeof(buffer), buffer);
