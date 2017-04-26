@@ -16,6 +16,7 @@
 
 #include "RenderObject.cpp"
 #include "ShaderObject.cpp"
+#include "ShaderDefinitions.h"
 #include "Camera.cpp"
 #include "PerlinTexture.cpp"
 
@@ -197,7 +198,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 //    PSTR lpCmdLine, INT nCmdShow)
 int main()
 {
-  bool debugMode = false;
+  bool DebugMode = false;
 
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -205,16 +206,16 @@ int main()
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut",
+	GLFWwindow* Window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut",
                                         NULL, NULL);
-  if(!window)
+  if(!Window)
   {
     printf("GLFW window creation failure.\n");
     glfwTerminate();
     return -1;
   }
 
-  glfwMakeContextCurrent(window);
+  glfwMakeContextCurrent(Window);
 
   glewExperimental = GL_TRUE;
   if (glewInit() != GLEW_OK)
@@ -224,235 +225,33 @@ int main()
     return -1;
   }
 
-  glfwSetKeyCallback(window, keyCallback);
-  glfwSetCursorPosCallback(window, mouseCallback);
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetKeyCallback(Window, keyCallback);
+  glfwSetCursorPosCallback(Window, mouseCallback);
+  glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  int width, height;
-  glfwGetFramebufferSize(window, &width, &height);
-  glViewport(0, 0, width, height);
-  //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  int Width, Height;
+  glfwGetFramebufferSize(Window, &Width, &Height);
+  glViewport(0, 0, Width, Height);
   glEnable(GL_DEPTH_TEST);
 
-  GLchar* gPassVertexShaderSource =
-    #include "gPass.vs"
-  GLchar* gPassFragmentShaderSource =
-    #include "gPass.fs"
+  shader GPassShader;
+  gpass_info GPassShaderInfo;  
+  InitGPassShader(&GPassShader, &GPassShaderInfo, Width, Height); 
 
-  GLchar* lPassVertexShaderSource =
-    #include "lPass.vs"
-  GLchar* lPassFragmentShaderSource =
-    #include "lPass.fs"
+  shader LPassShader;
+  lpass_info LPassShaderInfo;
+  InitLPassShader(&LPassShader, &LPassShaderInfo);
 
-  GLchar* debugObjectsVertexShaderSource =
-    #include "debugObjects.vs"
-  GLchar* debugObjectsFragmentShaderSource =
-    #include "debugObjects.fs"
-  GLchar* pointLightOutlineVertexShaderSource =
-    #include "pointLightOutline.vs"
-  GLchar* pointLightOutlineFragmentShaderSource =
-    #include "pointLightOutline.fs"
-  
-  GLchar* guiVertexShaderSource =
-    #include "gui.vs"
-  GLchar* guiGeometryShaderSource =
-    #include "gui.gs"
-  GLchar* guiFragmentShaderSource =
-    #include "gui.fs"
+  shader BloomShader;
+  bloom_info BloomShaderInfo;
+  InitBloomShader(&BloomShader, &BloomShaderInfo, Width, Height); 
 
-  ShaderObject gPassShader = {};
-  gPassShader.vertexShaderSource = gPassVertexShaderSource;
-  gPassShader.fragmentShaderSource = gPassFragmentShaderSource;
-  compileShaderObject(&gPassShader);
-  linkShaderObject(&gPassShader);
+  shader OutlineShader;
+  outline_info OutlineShaderInfo;
+  InitOutlineShader(&OutlineShader, &OutlineShaderInfo, Width, Height);
 
-  glUseProgram(gPassShader.shaderProgramID);
-  GLuint perlinNoiseLocation = glGetUniformLocation(gPassShader.shaderProgramID, "perlinNoise");
-  glUniform1i(perlinNoiseLocation, 0);
-
-  ShaderObject lPassShader = {};
-  lPassShader.vertexShaderSource = lPassVertexShaderSource;
-  lPassShader.fragmentShaderSource = lPassFragmentShaderSource;
-  compileShaderObject(&lPassShader);
-  linkShaderObject(&lPassShader);
-
-  glUseProgram(lPassShader.shaderProgramID);
-
-  GLuint positionBufferLocation = glGetUniformLocation(
-    lPassShader.shaderProgramID, "positionBuffer");
-  glUniform1i(positionBufferLocation, 0);
-  GLuint normalBufferLocation = glGetUniformLocation(
-    lPassShader.shaderProgramID, "normalBuffer");
-  glUniform1i(normalBufferLocation, 1);
-  GLuint colorBufferLocation = glGetUniformLocation(
-    lPassShader.shaderProgramID, "colorBuffer");
-  glUniform1i(colorBufferLocation, 2);
-  GLuint pointLightColorBufferLocation = glGetUniformLocation(
-      lPassShader.shaderProgramID, "lightColorBuffer");
-  glUniform1i(pointLightColorBufferLocation, 3);
-
-  GLuint debugOnSubroutineIndex = glGetSubroutineIndex(
-    lPassShader.shaderProgramID,
-    GL_FRAGMENT_SHADER, "debugOn");
-  GLuint debugOffSubroutineIndex = glGetSubroutineIndex(
-    lPassShader.shaderProgramID,
-    GL_FRAGMENT_SHADER, "debugOff");
-
-  glUseProgram(0);
-
-  ShaderObject debugObjectsShader = {};
-  debugObjectsShader.vertexShaderSource = debugObjectsVertexShaderSource;
-  debugObjectsShader.fragmentShaderSource = debugObjectsFragmentShaderSource;
-  compileShaderObject(&debugObjectsShader);
-  linkShaderObject(&debugObjectsShader);
- 
-  glUseProgram(debugObjectsShader.shaderProgramID);
-
-  GLuint discardNonSpheresIndex = glGetSubroutineIndex(
-    debugObjectsShader.shaderProgramID,
-    GL_FRAGMENT_SHADER, "discardNonSpheres");
-
-  GLuint blurIndices[2];
-  blurIndices[0] = glGetSubroutineIndex(
-    debugObjectsShader.shaderProgramID,
-    GL_FRAGMENT_SHADER, "blurHorizontal");
-  blurIndices[1] = glGetSubroutineIndex(
-    debugObjectsShader.shaderProgramID,
-    GL_FRAGMENT_SHADER, "blurVertical");
-  
-  glUseProgram(0);
-
-  ShaderObject pointLightOutlineShader = {};
-  pointLightOutlineShader.vertexShaderSource = pointLightOutlineVertexShaderSource;
-  pointLightOutlineShader.fragmentShaderSource = pointLightOutlineFragmentShaderSource;
-  compileShaderObject(&pointLightOutlineShader);
-  linkShaderObject(&pointLightOutlineShader);
-
-  ShaderObject guiShader = {};
-  guiShader.vertexShaderSource = guiVertexShaderSource;
-  guiShader.geometryShaderSource = guiGeometryShaderSource;
-  guiShader.fragmentShaderSource = guiFragmentShaderSource;
-  compileShaderObject(&guiShader);
-  linkShaderObject(&guiShader);
-
-  GLuint gBufferID;
-  glGenFramebuffers(1, &gBufferID);
-  glBindFramebuffer(GL_FRAMEBUFFER, gBufferID);
-  
-  // Note: gBuffer textures for defaulty shaded objects. 
-  GLuint positionBufferID, normalBufferID, colorBufferID;
-
-  glGenTextures(1, &positionBufferID);
-  glBindTexture(GL_TEXTURE_2D, positionBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                         positionBufferID, 0);
-
-  glGenTextures(1, &normalBufferID);
-  glBindTexture(GL_TEXTURE_2D, normalBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
-                         normalBufferID, 0);
-
-  glGenTextures(1, &colorBufferID);
-  glBindTexture(GL_TEXTURE_2D, colorBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D,
-                         colorBufferID, 0);
-  
-  // Note: gBuffer textures for point lights.
-  GLuint pointLightColorBufferID;
-
-  glGenTextures(1, &pointLightColorBufferID);
-  glBindTexture(GL_TEXTURE_2D, pointLightColorBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
-               GL_RGBA, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D,
-                         pointLightColorBufferID, 0);
-
-  GLuint attachments[4] = {
-    GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
-    GL_COLOR_ATTACHMENT3 };
-  glDrawBuffers(4, attachments);
-
-  GLuint rboDepth;
-  glGenRenderbuffers(1, &rboDepth);
-  glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                            GL_RENDERBUFFER, rboDepth);
-  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    printf("Framebuffer is broken!");
-  
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-  GLuint pointLightFBOs[2];
-  glGenFramebuffers(2, pointLightFBOs);
-
-  GLuint pointLightBlurBufferIDs[2];
-  glGenTextures(2, pointLightBlurBufferIDs);
-  for(int pointLightBlurBufferIndex = 0;
-      pointLightBlurBufferIndex < 2;
-      ++pointLightBlurBufferIndex)
-  {
-    glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[pointLightBlurBufferIndex]);
-    glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[pointLightBlurBufferIndex]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0,
-                 GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                           GL_TEXTURE_2D, pointLightBlurBufferIDs[pointLightBlurBufferIndex], 0);
-    GLuint attachment[1] = { GL_COLOR_ATTACHMENT0 };
-    glDrawBuffers(1, attachment);
-
-    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-      printf("Framebuffer is broken!");
-  }
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-  //Note: framebuffer for outline
-  GLuint pointLightOutlineFBO;
-  glGenFramebuffers(1, &pointLightOutlineFBO);
-
-  GLuint pointLightOutlineColorBufferID;
-  glGenTextures(1, &pointLightOutlineColorBufferID);
-
-  glBindFramebuffer(GL_FRAMEBUFFER, pointLightOutlineFBO);
-  glBindTexture(GL_TEXTURE_2D, pointLightOutlineColorBufferID);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0,
-               GL_RGB, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                         GL_TEXTURE_2D, pointLightOutlineColorBufferID, 0);
-  
-  GLuint pointLightOutlineStencilBufferID;
-  glGenRenderbuffers(1, &pointLightOutlineStencilBufferID);
-  glBindRenderbuffer(GL_RENDERBUFFER, pointLightOutlineStencilBufferID);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, width, height);
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-                            GL_RENDERBUFFER, pointLightOutlineStencilBufferID);
-  if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    printf("Framebuffer is broken!");
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  shader GUIShader;
+  InitGUIShader(&GUIShader);
   
   GLuint quadVAO;
   GLuint quadVBO;
@@ -511,7 +310,7 @@ int main()
   generate2DPerlinNoise(perlinNoiseTextureID, 420);
 
   Camera camera;
-  initCamera(&camera, (GLfloat)width, (GLfloat)height);
+  initCamera(&camera, (GLfloat)Width, (GLfloat)Height);
 
   DirectionalLight directionalLights[1] = {};
   directionalLights[0].direction = glm::vec3(0.f, 5.f, -2.f);
@@ -527,41 +326,14 @@ int main()
   pointLights[1].position = glm::vec3(0.f, 1.f, -8.f);
   pointLights[1].color = glm::vec3(1.f, 1.f, 1.f);
 
-  GLuint pointLightsUBOIndex = glGetUniformBlockIndex(
-      lPassShader.shaderProgramID,
-      "pointLightsUBO");
-  glUniformBlockBinding(
-      lPassShader.shaderProgramID,
-      pointLightsUBOIndex, 0);
-  
-  GLuint pointLightsUBO;
-  glGenBuffers(1, &pointLightsUBO);
-  int pointLightsUBOSize = // Alignment Offset Description
-    sizeof(float) * 4      // 16        0      vec3 color (vec4 min)
-    + sizeof(float) * 4    // 16        16     vec3 position (vec4 min)
-    + sizeof(float)        // 4         32     float attenuationLinear
-    + sizeof(float)        // 4         36     float attenuationQuadratic
-    + sizeof(float)        // 4         40     float intensityAmbient
-    + sizeof(float)        // 4         44     float intensityDiffuse
-    + sizeof(float);       // 4         48     float intensitySpecular
-  int alignment = sizeof(float) * 4;  //(vec4 min for structs)
-  pointLightsUBOSize = (pointLightsUBOSize + (alignment - 1))
-                     / alignment * alignment;
-  int totalsize = pointLightsUBOSize * POINT_LIGHT_COUNT;
-
-  glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
-  glBufferData(GL_UNIFORM_BUFFER, totalsize, NULL, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
-  glBindBufferRange(GL_UNIFORM_BUFFER, 0, pointLightsUBO, 0, totalsize);
-
 #define OBJECT_TYPE_NONE 0
 #define OBJECT_TYPE_DEFAULT 1
 #define OBJECT_TYPE_POINTLIGHT 2
-  RenderObject lightShape;
-  lightShape.objectType = OBJECT_TYPE_POINTLIGHT;
-  lightShape.mesh = par_shapes_create_parametric_sphere(32, 32);
-  lightShape.model = glm::scale(lightShape.model, glm::vec3(0.5f, 0.5f, 0.5f));
-  initRenderObject(&lightShape);  
+  RenderObject LightShape;
+  LightShape.objectType = OBJECT_TYPE_POINTLIGHT;
+  LightShape.mesh = par_shapes_create_parametric_sphere(32, 32);
+  LightShape.model = glm::scale(LightShape.model, glm::vec3(0.5f, 0.5f, 0.5f));
+  initRenderObject(&LightShape);  
 
   RenderObject shape;
   shape.objectType = OBJECT_TYPE_DEFAULT;
@@ -589,7 +361,7 @@ int main()
 
   GLfloat dT = 0.f;
   GLfloat timeAtLastFrameStart = 0.f;
-  while(!glfwWindowShouldClose(window))
+  while(!glfwWindowShouldClose(Window))
   {
     GLfloat timeNow = (GLfloat)glfwGetTime();
     dT = timeNow - timeAtLastFrameStart;
@@ -628,9 +400,9 @@ int main()
     }
 
     if(keysPressed[GLFW_KEY_GRAVE_ACCENT])
-      debugMode = !debugMode;
+      DebugMode = !DebugMode;
 
-    if(debugMode)
+    if(DebugMode)
     {
       if(keysPressed[GLFW_KEY_1])
         currentSliderIndex = 0;
@@ -656,101 +428,123 @@ int main()
     }
 
 #define ROTATION_SPEED .2f
-    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f, .5f, 0.5f));
-    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(0.3f, 0.f, 0.6f));
+    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f,
+       .5f, 0.5f));
+    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT,
+     glm::vec3(0.3f, 0.f, 0.6f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
-    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f, 0.f, 0.f));
+    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f,
+       0.f, 0.f));
     shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, -5.f));
-    glBindFramebuffer(GL_FRAMEBUFFER, gBufferID);
-    glClearColor(0.f, 0.f, 0.f, 0.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//    glClearFramebufferfv(GL_COLOR, normalBufferID);
-    glUseProgram(gPassShader.shaderProgramID);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
 
-    GLint projectionLocation = glGetUniformLocation(gPassShader.shaderProgramID, "projection");
-    glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(camera.projection));
-    GLint viewLocation = glGetUniformLocation(gPassShader.shaderProgramID, "view");
-    glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(camera.view));
-
-    drawRenderObject(&shape2, gPassShader.shaderProgramID);
-    drawRenderObject(&shape, gPassShader.shaderProgramID);
-    if(debugMode)
+    glBindFramebuffer(GL_FRAMEBUFFER, GPassShaderInfo.FrameBufferID);
     {
-      for(int pointLightIndex = 0; pointLightIndex < POINT_LIGHT_COUNT; ++pointLightIndex)
+      glClearColor(0.f, 0.f, 0.f, 0.f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+      glUseProgram(GPassShader.ID);
       {
-        drawPointLightDebugModel(
-          lightShape, 
-          &pointLights[pointLightIndex],
-          gPassShader.shaderProgramID);
-      }
-    }
+        glUniformMatrix4fv(glGetUniformLocation(GPassShader.ID, "projection"),
+          1, GL_FALSE, glm::value_ptr(camera.projection));
+        glUniformMatrix4fv(glGetUniformLocation(GPassShader.ID,"view"), 1,
+          GL_FALSE, glm::value_ptr(camera.view));
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
+          drawRenderObject(&shape2, GPassShader.ID);
+          drawRenderObject(&shape, GPassShader.ID);
+
+        if(DebugMode)
+        {
+          for(int pointLightIndex = 0;
+              pointLightIndex < POINT_LIGHT_COUNT;
+              ++pointLightIndex)
+          {
+            drawPointLightDebugModel(LightShape,
+             &pointLights[pointLightIndex], GPassShader.ID);
+          }
+        }
+      } glUseProgram(0);
+    }glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     glClearColor(.4f, .6f, .2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //Note: put in a better place
-    GLboolean vertical = false;
-    if(debugMode)
+    if(DebugMode)
     {
-      glUseProgram(debugObjectsShader.shaderProgramID);
-      
-      //Note: This bloom method is taken from learnopengl.com 
-      for(int iteration = 0; iteration < 10; ++iteration)
+      glUseProgram(BloomShader.ID);
+      { 
+        //Note: This bloom method is taken from learnopengl.com 
+        GLboolean Vertical = false;
+#define BLUR_ITERATIONS 10
+        for(int Iteration = 0; Iteration < BLUR_ITERATIONS; ++Iteration)
+        {
+          glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+            &BloomShaderInfo.SubroutineIndices[Vertical]);
+
+          glBindFramebuffer(GL_FRAMEBUFFER,
+            BloomShaderInfo.FrameBufferIDs[Vertical]);
+          {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,
+              Iteration == 0 ?
+              GPassShaderInfo.PointLightColorBufferID :
+              BloomShaderInfo.ColorBufferIDs[!Vertical]);
+            
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+             
+          } glBindFramebuffer(GL_FRAMEBUFFER, 0);
+          Vertical = !Vertical;
+        }
+      } glUseProgram(0);
+    }
+
+    glUseProgram(LPassShader.ID);
+    {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.PositionBufferID);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.NormalBufferID);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.ColorBufferID);
+
+      if(DebugMode)
       {
-        glBindFramebuffer(GL_FRAMEBUFFER, pointLightFBOs[vertical]);
-        glActiveTexture(GL_TEXTURE0);
-        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &blurIndices[vertical]);
+        glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D,
-           iteration == 0 ?
-           pointLightColorBufferID : pointLightBlurBufferIDs[!vertical]);
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        vertical = !vertical;
+          BloomShaderInfo.ColorBufferIDs[(BLUR_ITERATIONS + 1) % 2]);
+
+        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+          &LPassShaderInfo.DebugOnIndex);
       }
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
+      else
+      {
+        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+          &LPassShaderInfo.DebugOffIndex);
+      }
 
-    glUseProgram(lPassShader.shaderProgramID);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, positionBufferID);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, normalBufferID);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, colorBufferID);
+      glUniform3fv(glGetUniformLocation(LPassShader.ID, "viewPosition"), 1,
+        glm::value_ptr(camera.position));
 
-    if(debugMode)
-    {
-      glActiveTexture(GL_TEXTURE3);
-      glBindTexture(GL_TEXTURE_2D, pointLightBlurBufferIDs[!vertical]);
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOnSubroutineIndex);
-    }
-    else
-    {
-      glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1, &debugOffSubroutineIndex);
-    }
+      glUniform3fv(glGetUniformLocation(LPassShader.ID,
+        "directionalLights[0].direction"), 1,
+        glm::value_ptr(directionalLights[0].direction));
+      glUniform3fv(glGetUniformLocation(LPassShader.ID,
+        "directionalLights[0].color"), 1,
+        glm::value_ptr(directionalLights[0].color));
 
-    GLint viewPositionLocation = glGetUniformLocation(lPassShader.shaderProgramID, "viewPosition");
-    glUniform3fv(viewPositionLocation, 1, glm::value_ptr(camera.position));
-
-    {
-      GLint lightDirectionLocation= glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].direction");
-      glUniform3fv(lightDirectionLocation, 1, glm::value_ptr(directionalLights[0].direction));
-      GLint lightColorLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].color");
-      glUniform3fv(lightColorLocation, 1, glm::value_ptr(directionalLights[0].color));
-
-      GLint ambientIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensityAmbient");
-      glUniform1f(ambientIntensityLocation, directionalLights[0].intensity.ambient / 255.f);
-      GLint diffuseIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensityDiffuse");
-      glUniform1f(diffuseIntensityLocation, directionalLights[0].intensity.diffuse / 255.f);
-      GLint specularIntensityLocation = glGetUniformLocation(lPassShader.shaderProgramID, "directionalLights[0].intensitySpecular");
-      glUniform1f(specularIntensityLocation, directionalLights[0].intensity.specular / 255.f);
-    }
-
-    { 
-      glBindBuffer(GL_UNIFORM_BUFFER, pointLightsUBO);
+      glUniform1f(glGetUniformLocation(LPassShader.ID,
+        "directionalLights[0].intensityAmbient"),
+        directionalLights[0].intensity.ambient / 255.f);
+      glUniform1f(glGetUniformLocation(LPassShader.ID,
+        "directionalLights[0].intensityDiffuse"),
+        directionalLights[0].intensity.diffuse / 255.f);
+      glUniform1f(glGetUniformLocation(LPassShader.ID,
+        "directionalLights[0].intensitySpecular"),
+        directionalLights[0].intensity.specular / 255.f);
+    
+      glBindBuffer(GL_UNIFORM_BUFFER, LPassShaderInfo.UniformBufferID);
       float buffer[32];
       int offset = 0;
       for(int pointLightIndex = 0;
@@ -782,87 +576,99 @@ int main()
         offset += 3;
         offset += 3;
       }
-      glBufferSubData(GL_UNIFORM_BUFFER,
-        0, sizeof(buffer), buffer);
+      glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(buffer), buffer);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }    
 
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+      glBindVertexArray(quadVAO);
+      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    } glUseProgram(0);
 
-    if(debugMode)
-    {
-      //Todo: Put the stencil in here 
-      glEnable(GL_STENCIL_TEST);
-      glBindFramebuffer(GL_FRAMEBUFFER, pointLightOutlineFBO);
-      glUseProgram(pointLightOutlineShader.shaderProgramID);
-      projectionLocation = glGetUniformLocation(pointLightOutlineShader.shaderProgramID, "projection");
-      glUniformMatrix4fv(projectionLocation, 1, GL_FALSE, glm::value_ptr(camera.projection));
-      viewLocation = glGetUniformLocation(pointLightOutlineShader.shaderProgramID, "view");
-      glUniformMatrix4fv(viewLocation, 1, GL_FALSE, glm::value_ptr(camera.view));
-      glStencilFunc(GL_ALWAYS, 1, 0xFF);
-      glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-      glStencilMask(0xFF);
-      glDepthMask(GL_FALSE);
-      glClearColor(1.f, 1.f, 1.f, 1.f);
-      glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-      drawPointLightDebugModel(
-          lightShape,
-          &pointLights[currentPointLightIndex],
-          0.8f,
-          pointLightOutlineShader.shaderProgramID); 
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, pointLightOutlineFBO);
-      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-      glBlitFramebuffer(0, 0, width, height,
-                        0, 0, width, height,
-                        GL_STENCIL_BUFFER_BIT, GL_NEAREST);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-      glStencilMask(0x00);
-      glDepthMask(GL_TRUE);
-      glClear(GL_DEPTH_BUFFER_BIT);
-      drawPointLightDebugModel(
-          lightShape,
-          &pointLights[currentPointLightIndex],
-          pointLightOutlineShader.shaderProgramID);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-      glDisable(GL_STENCIL_TEST);
-      glUseProgram(guiShader.shaderProgramID);
+   if(DebugMode)
+   {
+     glEnable(GL_STENCIL_TEST);
 
-      GLint onePixelLocation = glGetUniformLocation(guiShader.shaderProgramID, "onePixel");
-      glUniform1f(onePixelLocation, 1.f / SCREEN_WIDTH * 2);
+     glBindFramebuffer(GL_FRAMEBUFFER, OutlineShaderInfo.FrameBufferID);
+     {
+       glStencilFunc(GL_ALWAYS, 1, 0xFF);
+       glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+       glStencilMask(0xFF);
+       glDepthMask(GL_FALSE);
+       glClearColor(1.f, 1.f, 1.f, 1.f);
+       glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+       
+       glUseProgram(OutlineShader.ID);
+       {
+         glUniformMatrix4fv(
+           glGetUniformLocation(OutlineShader.ID, "projection"),
+           1, GL_FALSE, glm::value_ptr(camera.projection));
+         glUniformMatrix4fv(
+           glGetUniformLocation(OutlineShader.ID, "view"),
+           1, GL_FALSE, glm::value_ptr(camera.view));
 
-      sliderTs[0] = *currentLightSliders[0];
-      sliderTs[1] = *currentLightSliders[1];
-      sliderTs[2] = *currentLightSliders[2];
-      sliderTs[3] = *currentLightSliders[3];
-      sliderTs[4] = *currentLightSliders[4];
-    
-      glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
-      glBufferData(GL_ARRAY_BUFFER,
-                   sizeof(float) * 5,
-                   sliderGUI.ts,
-                   GL_DYNAMIC_DRAW);
+         drawPointLightDebugModel(LightShape,
+          &pointLights[currentPointLightIndex], 0.8f, OutlineShader.ID);
 
-      for(int sliderIndex = 0;
-        sliderIndex < 5;
-        ++sliderIndex)
-      {
-          sliderIsSelecteds[sliderIndex] = 0;  
-      }
-      sliderIsSelecteds[currentSliderIndex] = 1;
+         glBindFramebuffer(GL_READ_FRAMEBUFFER,
+           OutlineShaderInfo.FrameBufferID);
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+         {
+           glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                             0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                             GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+           glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-      glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboIsSelecteds);
-      glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(int) * 5,
-                 sliderGUI.isSelecteds,
-                 GL_DYNAMIC_DRAW);
+           glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+           glStencilMask(0x00);
+           glDepthMask(GL_TRUE);
+           glClear(GL_DEPTH_BUFFER_BIT);
 
-      glBindVertexArray(sliderGUI.VAO);
-      glDrawArrays(GL_POINTS, 0, 5);
-      glBindVertexArray(0);
-    }
+           drawPointLightDebugModel(LightShape,
+             &pointLights[currentPointLightIndex],
+             OutlineShader.ID);
+
+           glDisable(GL_STENCIL_TEST);
+         } //glBindFramebuffer
+       } glUseProgram(0);
+     } glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+     glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+     glUseProgram(GUIShader.ID); 
+     {
+       glUniform1f(glGetUniformLocation(GUIShader.ID, "onePixel"),
+         1.f / SCREEN_WIDTH * 2);
+
+       sliderTs[0] = *currentLightSliders[0];
+       sliderTs[1] = *currentLightSliders[1];
+       sliderTs[2] = *currentLightSliders[2];
+       sliderTs[3] = *currentLightSliders[3];
+       sliderTs[4] = *currentLightSliders[4];
+     
+       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
+       glBufferData(GL_ARRAY_BUFFER,
+                    sizeof(float) * 5,
+                    sliderGUI.ts,
+                    GL_DYNAMIC_DRAW);
+
+       for(int SliderIndex = 0;
+         SliderIndex < 5;
+         ++SliderIndex)
+       {
+           sliderIsSelecteds[SliderIndex] = 0;  
+       }
+       sliderIsSelecteds[currentSliderIndex] = 1;
+
+       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboIsSelecteds);
+       glBufferData(GL_ARRAY_BUFFER,
+                  sizeof(int) * 5,
+                  sliderGUI.isSelecteds,
+                  GL_DYNAMIC_DRAW);
+
+       glBindVertexArray(sliderGUI.VAO);
+       glDrawArrays(GL_POINTS, 0, 5);
+       glBindVertexArray(0);
+     }
+   }
 
     GLenum err;
     bool shouldQuit = false;
@@ -873,10 +679,10 @@ int main()
     }
     if(shouldQuit)
     {
-      glfwSetWindowShouldClose(window, GL_TRUE);
+      glfwSetWindowShouldClose(Window, GL_TRUE);
     }
 
-    glfwSwapBuffers(window);
+    glfwSwapBuffers(Window);
     Sleep(1);
   }
 

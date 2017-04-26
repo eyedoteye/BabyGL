@@ -1,86 +1,91 @@
-struct ShaderObject
+struct shader
 {
-  GLuint vertexShaderID;
-  GLuint geometryShaderID;
-  GLuint fragmentShaderID;
-  GLuint shaderProgramID;
+  GLuint VertexID;
+  GLuint GeometryID;
+  GLuint FragmentID;
+  GLuint ID;
 
-  char* vertexShaderSource;
-  char* geometryShaderSource;
-  char* fragmentShaderSource;
+  char* VertexSource;
+  char* GeometrySource;
+  char* FragmentSource;
+
+  char* Name;
 };
 
-void compileShaderObject(ShaderObject* shaderObject)
+void compileShader(shader* Shader)
 {
-  shaderObject->vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-  shaderObject->fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+  Shader->VertexID = glCreateShader(GL_VERTEX_SHADER);
+  Shader->FragmentID = glCreateShader(GL_FRAGMENT_SHADER);
 
-  glShaderSource(shaderObject->vertexShaderID, 1,
-                 &shaderObject->vertexShaderSource, NULL);
-  glShaderSource(shaderObject->fragmentShaderID, 1,
-                 &shaderObject->fragmentShaderSource, NULL);
+  glShaderSource(Shader->VertexID, 1,
+                 &Shader->VertexSource, NULL);
+  glShaderSource(Shader->FragmentID, 1,
+                 &Shader->FragmentSource, NULL);
 
-  glCompileShader(shaderObject->vertexShaderID);
-  glCompileShader(shaderObject->fragmentShaderID);
+  glCompileShader(Shader->VertexID);
+  glCompileShader(Shader->FragmentID);
 
-  GLint success;
-  GLchar infoLog[512];
+  GLint Success;
+  GLchar InfoLog[512];
   {
-    glGetShaderiv(shaderObject->fragmentShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
+    glGetShaderiv(Shader->FragmentID, GL_COMPILE_STATUS, &Success);
+    if(!Success)
     {
-      glGetShaderInfoLog(shaderObject->fragmentShaderID, 512, NULL, infoLog);
-      printf("Fragment Shader Compilation Failure: %s", infoLog);
+      glGetShaderInfoLog(Shader->FragmentID, 512, NULL, InfoLog);
+      printf("Fragment Shader Compilation Failure: %s\n"
+             "--: %s", Shader->Name, InfoLog);
     }
 
-    glGetShaderiv(shaderObject->vertexShaderID, GL_COMPILE_STATUS, &success);
-    if(!success)
+    glGetShaderiv(Shader->VertexID, GL_COMPILE_STATUS, &Success);
+    if(!Success)
     {
-      glGetShaderInfoLog(shaderObject->vertexShaderID, 512, NULL, infoLog);
-      printf("Vertex Shader Compilation Failure: %s", infoLog);
+      glGetShaderInfoLog(Shader->VertexID, 512, NULL, InfoLog);
+      printf("Vertex Shader Compilation Failure: %s\n"
+             "--: %s", Shader->Name, InfoLog);
     }
   }
 
-  if(shaderObject->geometryShaderSource != NULL)
+  if(Shader->GeometrySource != NULL)
   {
-    shaderObject->geometryShaderID = glCreateShader(GL_GEOMETRY_SHADER);
-    glShaderSource(shaderObject->geometryShaderID, 1,
-                   &shaderObject->geometryShaderSource, NULL);
-    glCompileShader(shaderObject->geometryShaderID);
+    Shader->GeometryID = glCreateShader(GL_GEOMETRY_SHADER);
+    glShaderSource(Shader->GeometryID, 1,
+                   &Shader->GeometrySource, NULL);
+    glCompileShader(Shader->GeometryID);
 
     {
-      glGetShaderiv(shaderObject->geometryShaderID, GL_COMPILE_STATUS, &success);
-      if(!success)
+      glGetShaderiv(Shader->GeometryID, GL_COMPILE_STATUS, &Success);
+      if(!Success)
       {
-        glGetShaderInfoLog(shaderObject->geometryShaderID, 512, NULL, infoLog);
-        printf("Geometry Shader Compilation Failure: %s", infoLog);
+        glGetShaderInfoLog(Shader->GeometryID, 512, NULL, InfoLog);
+        printf("Geometry Shader Compilation Failure: %s"
+               "--: %s", Shader->Name, InfoLog);
       }
     }
   }
 }
 
-void linkShaderObject(ShaderObject* shaderObject)
+void linkShader(shader* Shader)
 {
-  shaderObject->shaderProgramID = glCreateProgram();
-  glAttachShader(shaderObject->shaderProgramID,
-                 shaderObject->vertexShaderID);
-  glAttachShader(shaderObject->shaderProgramID,
-                 shaderObject->fragmentShaderID);
-  if(shaderObject->geometryShaderSource != NULL)
+  Shader->ID = glCreateProgram();
+  glAttachShader(Shader->ID,
+                 Shader->VertexID);
+  glAttachShader(Shader->ID,
+                 Shader->FragmentID);
+  if(Shader->GeometrySource != NULL)
   {
-    glAttachShader(shaderObject->shaderProgramID,
-                   shaderObject->geometryShaderID);
+    glAttachShader(Shader->ID,
+                   Shader->GeometryID);
   }
-  glLinkProgram(shaderObject->shaderProgramID);
+  glLinkProgram(Shader->ID);
 
   {
-    GLint success;
-    GLchar infoLog[512];
-    glGetProgramiv(shaderObject->shaderProgramID, GL_LINK_STATUS, &success);
-    if(!success)
+    GLint Success;
+    GLchar InfoLog[512];
+    glGetProgramiv(Shader->ID, GL_LINK_STATUS, &Success);
+    if(!Success)
     {
-      glGetProgramInfoLog(shaderObject->shaderProgramID, 512, NULL, infoLog);
-      printf("Shader Program Link Failure: %s", infoLog);
+      glGetProgramInfoLog(Shader->ID, 512, NULL, InfoLog);
+      printf("Shader Program Link Failure: %s", InfoLog);
     }
   }
 }
