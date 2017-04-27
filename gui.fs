@@ -1,10 +1,12 @@
 R""(
 #version 400 core
-out vec4 fragmentColor;
-in vec3 boxColor;
+out vec4 FragmentColor;
 
-void main()
+in vec3 BarColor;
+
+void
+main()
 {
-  fragmentColor = vec4(boxColor, 1.f);
+  FragmentColor = vec4(BarColor, 1.f);
 }
 )"";

@@ -1,56 +1,64 @@
-struct Camera
+struct camera
 {
-  glm::mat4 projection;
-  glm::mat4 view;
+  glm::mat4 Projection;
+  glm::mat4 View;
 
-  glm::vec3 position;
-  glm::vec3 front;
-  glm::vec3 up;
+  glm::vec3 Position;
+  glm::vec3 Front;
+  glm::vec3 Up;
 
-  GLfloat yaw;
-  GLfloat pitch;
+  GLfloat Yaw;
+  GLfloat Pitch;
 };
 
-void initCamera(Camera* camera, GLfloat width, GLfloat height)
+void
+InitCamera(camera* Camera, GLfloat Width, GLfloat Height)
 {
-  camera->projection = glm::perspective(45.f, width / height, 0.1f, 100.f);
+  Camera->Projection = glm::perspective(45.f, Width / Height, 0.1f, 100.f);
 
-  camera->position = glm::vec3(0.f, 0.f, -5.f);
-  camera->front = glm::vec3(0.f, 0.f, 1.f);
-  camera->up = glm::vec3(0.f, 1.f, 0.f);
+  Camera->Position = glm::vec3(0.f, 0.f, -5.f);
+  Camera->Front = glm::vec3(0.f, 0.f, 1.f);
+  Camera->Up = glm::vec3(0.f, 1.f, 0.f);
 
-  camera->yaw = 90.f;
-  camera->pitch = 0.f;
+  Camera->Yaw = 90.f;
+  Camera->Pitch = 0.f;
 }
 
-void updateCamera(Camera* camera, GLfloat xOffset, GLfloat yOffset, bool* keys, float dT)
+void
+UpdateCamera(
+  camera* Camera,
+  GLfloat XOffset,
+  GLfloat YOffset,
+  bool* Keys,
+  float Dt)
 {
-  if(keys[GLFW_KEY_W])
-    camera->position += camera->front * dT;
-  if(keys[GLFW_KEY_S])
-    camera->position -= camera->front * dT;
-  if(keys[GLFW_KEY_A])
-    camera->position -= glm::normalize(glm::cross(camera->front, camera->up)) * dT;
-  if(keys[GLFW_KEY_D])
-    camera->position += glm::normalize(glm::cross(camera->front, camera->up)) * dT;
-  if(keys[GLFW_KEY_SPACE])
-    camera->position += camera->up * dT;
-  if(keys[GLFW_KEY_LEFT_SHIFT])
-    camera->position -= camera->up * dT;
+  if(Keys[GLFW_KEY_W])
+    Camera->Position += Camera->Front * Dt;
+  if(Keys[GLFW_KEY_S])
+    Camera->Position -= Camera->Front * Dt;
+  if(Keys[GLFW_KEY_A])
+    Camera->Position -=
+      glm::normalize(glm::cross(Camera->Front, Camera->Up)) * Dt;
+  if(Keys[GLFW_KEY_D])
+    Camera->Position +=
+      glm::normalize(glm::cross(Camera->Front, Camera->Up)) * Dt;
+  if(Keys[GLFW_KEY_SPACE])
+    Camera->Position += Camera->Up * Dt;
+  if(Keys[GLFW_KEY_LEFT_SHIFT])
+    Camera->Position -= Camera->Up * Dt;
 
-  camera->pitch -= yOffset * 0.05f;
-  camera->yaw += xOffset * 0.05f;
+  Camera->Pitch -= YOffset * 0.05f;
+  Camera->Yaw += XOffset * 0.05f;
 
-  camera->pitch = camera->pitch > 89.f ? 89.f : camera->pitch;
-  camera->pitch = camera->pitch < -89.f ? -89.f : camera->pitch;
+  Camera->Pitch = Camera->Pitch > 89.f ? 89.f : Camera->Pitch;
+  Camera->Pitch = Camera->Pitch < -89.f ? -89.f : Camera->Pitch;
 
-  glm::vec3 front;
-  front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-  front.y = sin(glm::radians(camera->pitch));
-  front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-  camera->front = glm::normalize(front);
+  glm::vec3 Front;
+  Front.x = cos(glm::radians(Camera->Yaw)) * cos(glm::radians(Camera->Pitch));
+  Front.y = sin(glm::radians(Camera->Pitch));
+  Front.z = sin(glm::radians(Camera->Yaw)) * cos(glm::radians(Camera->Pitch));
+  Camera->Front = glm::normalize(Front);
 
-  camera->view = glm::lookAt(camera->position,
-                             camera->position + camera->front,
-                             camera->up);
+  Camera->View =
+    glm::lookAt(Camera->Position, Camera->Position + Camera->Front, Camera->Up);
 }

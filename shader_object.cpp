@@ -57,7 +57,7 @@ void compileShader(shader* Shader)
       if(!Success)
       {
         glGetShaderInfoLog(Shader->GeometryID, 512, NULL, InfoLog);
-        printf("Geometry Shader Compilation Failure: %s"
+        printf("Geometry Shader Compilation Failure: %s\n"
                "--: %s", Shader->Name, InfoLog);
       }
     }

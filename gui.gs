@@ -1,52 +1,55 @@
 R""(
 #version 400 core
-out vec3 boxColor;
-in VS_OUT
+out vec3 BarColor;
+
+in vs_out
 {
-  float t;
-  float barWidth;
-  vec2 dimensions;
-  int isSelected;
-} gs_in[];
+  float Value;
+  float ThumbWidth;
+  vec2 Dimensions;
+  int IsSelected; // No bool in GLSL
+} GSIn[];
 
 layout (points) in;
 layout (triangle_strip, max_vertices = 12) out;
 
-uniform float onePixel;
+uniform float OnePixel;
 
-void buildSquare(vec4 position, float width, float height)
+void
+BuildQuad(vec4 Position, float Width, float Height)
 {
- gl_Position = position;
- EmitVertex();
- gl_Position = position + vec4(width, 0.f, 0.f, 0.f);
- EmitVertex();
- gl_Position = position + vec4(0.f, -height, 0.f, 0.f);
- EmitVertex();
- gl_Position = position + vec4(width, -height, 0.f, 0.f);
- EmitVertex();
- EndPrimitive();
+  gl_Position = Position;
+  EmitVertex();
+  gl_Position = Position + vec4(Width, 0.f, 0.f, 0.f);
+  EmitVertex();
+  gl_Position = Position + vec4(0.f, -Height, 0.f, 0.f);
+  EmitVertex();
+  gl_Position = Position + vec4(Width, -Height, 0.f, 0.f);
+  EmitVertex();
+  EndPrimitive();
 }
 
-void main()
+void
+main()
 {
-  float width = gs_in[0].dimensions.x;
-  float barWidth = gs_in[0].barWidth;
-  float t = gs_in[0].t * (width - barWidth - onePixel * 2);
-  float height = gs_in[0].dimensions.y;
+  float Width = GSIn[0].Dimensions.x;
+  float ThumbWidth = GSIn[0].ThumbWidth;
+  float Value = GSIn[0].Value * (Width - ThumbWidth - OnePixel * 2);
+  float Height = GSIn[0].Dimensions.y;
   
-  boxColor = vec3(1.f); 
-  buildSquare(gl_in[0].gl_Position, t, height);
-  buildSquare(gl_in[0].gl_Position
-                + vec4(t + onePixel * 2 + barWidth, vec3(0.f)),
-              width - t - onePixel * 2 - barWidth, height);
+  BarColor = vec3(1.f); 
+  BuildQuad(gl_in[0].gl_Position, Value, Height);
+  BuildQuad(gl_in[0].gl_Position
+                + vec4(Value + OnePixel * 2 + ThumbWidth, vec3(0.f)),
+              Width - Value - OnePixel * 2 - ThumbWidth, Height);
   
-  if(gs_in[0].isSelected != 0)
+  if(GSIn[0].IsSelected != 0)
   {
-    boxColor = vec3(0.f);
+    BarColor = vec3(0.f);
   }
   
-  buildSquare(gl_in[0].gl_Position
-    + vec4(t + onePixel, vec3(0.f)),
-  barWidth, height);
+  BuildQuad(gl_in[0].gl_Position
+    + vec4(Value + OnePixel, vec3(0.f)),
+  ThumbWidth, Height);
 }
 )"";

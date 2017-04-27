@@ -14,181 +14,196 @@
 #include <par/par_shapes.h>
 #pragma warning(pop)
 
-#include "RenderObject.cpp"
-#include "ShaderObject.cpp"
-#include "ShaderDefinitions.h"
-#include "Camera.cpp"
-#include "PerlinTexture.cpp"
+#include "render_object.cpp"
+#include "shader_object.cpp"
+#include "shader_definitions.h"
+#include "camera.cpp"
+#include "perlin_texture.cpp"
 
 #include <stdlib.h>
 #include <time.h>
 
-struct DirectionalLight
+struct directional_light
 {
-  glm::vec3 direction;
-  glm::vec3 color;
+  glm::vec3 Direction;
+  glm::vec3 Color;
   struct
   {
-    float ambient;
-    float diffuse;
-    float specular;
-  } intensity;
+    float Ambient;
+    float Diffuse;
+    float Specular;
+  } Intensity;
 };
 
-struct PointLight
+struct point_light
 {
-  glm::vec3 position;
-  glm::vec3 color;
+  glm::vec3 Position;
+  glm::vec3 Color;
   union
   {
     struct
     {
-      float ambient;
-      float diffuse;
-      float specular;
-    } intensity;
-    float intensities[3];
+      float Ambient;
+      float Diffuse;
+      float Specular;
+    } Intensity;
+    float Intensities[3];
   };
   union
   {
     struct
     {
-      float linear;
-      float quadratic;
-    } attenuation;
-    float attenuations[2];
+      float Linear;
+      float Quadratic;
+    } Attenuation;
+    float Attenuations[2];
   };
 };
 
-void flattenPointLightSliders(
-  PointLight* pointLight,
-  float** lightSlidersArray)
+void
+FlattenPointLightSliders(
+  point_light* PointLight,
+  float** LightSliders)
 {
-  for(int intensityIndex = 0;
-      intensityIndex < 3;
-      ++intensityIndex)
+  for(int IntensityIndex = 0;
+      IntensityIndex < 3;
+      ++IntensityIndex)
   {
-    lightSlidersArray[intensityIndex] =
-      &pointLight->intensities[intensityIndex];
+    LightSliders[IntensityIndex] =
+      &PointLight->Intensities[IntensityIndex];
   }
-  for(int attenuationIndex = 0;
-      attenuationIndex < 2;
-      ++attenuationIndex)
+  for(int AttenuationIndex = 0;
+      AttenuationIndex < 2;
+      ++AttenuationIndex)
   {
-    lightSlidersArray[3 + attenuationIndex] =
-      &pointLight->attenuations[attenuationIndex];
+    LightSliders[3 + AttenuationIndex] =
+      &PointLight->Attenuations[AttenuationIndex];
   }
 }
 
-void drawPointLightDebugModel(
-  RenderObject debugModel,
-  PointLight* pointLight,
-  float scale,
-  GLuint shaderProgramID)
+void DrawPointLightModel(
+  render_object Renderable,
+  point_light* PointLight,
+  float Scale,
+  GLuint ShaderProgramID)
 {
-  debugModel.model = glm::translate(debugModel.model, pointLight->position);
-  debugModel.model = glm::scale(debugModel.model, glm::vec3(scale, scale, scale));
-  debugModel.color = pointLight->color;
-  drawRenderObject(&debugModel, shaderProgramID);
+  Renderable.ModelMatrix =
+    glm::translate(Renderable.ModelMatrix, PointLight->Position);
+  Renderable.ModelMatrix =
+    glm::scale(Renderable.ModelMatrix, glm::vec3(Scale, Scale, Scale));
+  Renderable.Color = PointLight->Color;
+  DrawRenderObject(&Renderable, ShaderProgramID);
 }
 
-void drawPointLightDebugModel(
-  RenderObject debugModel,
-  PointLight* pointLight,
-  GLuint shaderProgramID)
+void DrawPointLightModel(
+  render_object Renderable,
+  point_light* PointLight,
+  GLuint ShaderProgramID)
 {
-  debugModel.model = glm::translate(debugModel.model, pointLight->position);
-  debugModel.color = pointLight->color;
-  drawRenderObject(&debugModel, shaderProgramID);
+  Renderable.ModelMatrix =
+    glm::translate(Renderable.ModelMatrix, PointLight->Position);
+  Renderable.Color = PointLight->Color;
+  DrawRenderObject(&Renderable, ShaderProgramID);
 }
 
-struct SliderGUI
+struct slider_gui
 {
   GLuint VAO;
-  GLuint vboPositions, vboTs, vboIsSelecteds;
+  GLuint PositionVBO, ValueVBO, SelectionVBO;
 
-  int count;
-  float* positions;
-  float* ts;
-  int* isSelecteds;
+  int Count;
+  float* Positions;
+  float* Values;
+  int* Selections; // Note: No Booleans in GLSL
 };
 
-void initSliderGUI(SliderGUI *sliderGUI, int count)
+void
+InitSliderGUI(slider_gui *SliderGUI, int Count)
 {
-  glGenVertexArrays(1, &sliderGUI->VAO);
-  glGenBuffers(1, &sliderGUI->vboPositions);
-  glGenBuffers(1, &sliderGUI->vboTs);
-  glGenBuffers(1, &sliderGUI->vboIsSelecteds);
+  glGenVertexArrays(1, &SliderGUI->VAO);
+  glGenBuffers(1, &SliderGUI->PositionVBO);
+  glGenBuffers(1, &SliderGUI->ValueVBO);
+  glGenBuffers(1, &SliderGUI->SelectionVBO);
 
-  glBindVertexArray(sliderGUI->VAO);
+  glBindVertexArray(SliderGUI->VAO);
   {
-    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboPositions);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * count * 5,
-                 sliderGUI->positions,
-                 GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(float) * 5,
-                          (GLvoid*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(float) * 5,
-                          (GLvoid*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE,
-                          sizeof(float) * 5,
-                          (GLvoid*)(4 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    glBindBuffer(GL_ARRAY_BUFFER, SliderGUI->PositionVBO);
+    {
+      glBufferData(GL_ARRAY_BUFFER,
+                   sizeof(float) * Count * 5,
+                   SliderGUI->Positions,
+                   GL_STATIC_DRAW);
+      glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                            sizeof(float) * 5,
+                            (GLvoid*)0);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+                            sizeof(float) * 5,
+                            (GLvoid*)(2 * sizeof(float)));
+      glEnableVertexAttribArray(1);
+      glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE,
+                            sizeof(float) * 5,
+                            (GLvoid*)(4 * sizeof(float)));
+      glEnableVertexAttribArray(2);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, SliderGUI->ValueVBO);
+    {
+      glBufferData(GL_ARRAY_BUFFER,
+                   sizeof(float) * Count,
+                   SliderGUI->Values,
+                   GL_DYNAMIC_DRAW);
+      glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
+                            sizeof(float),
+                            (GLvoid*)0);
+      glEnableVertexAttribArray(3);
 
-    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboTs);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(float) * count,
-                 sliderGUI->ts,
-                 GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE,
-                          sizeof(float),
+      glBindBuffer(GL_ARRAY_BUFFER, SliderGUI->SelectionVBO);
+      glBufferData(GL_ARRAY_BUFFER,
+                   sizeof(int) * Count,
+                   SliderGUI->Selections,
+                   GL_DYNAMIC_DRAW);
+      glVertexAttribPointer(4, 1, GL_INT, GL_FALSE,
+                            sizeof(int),
                           (GLvoid*)0);
-    glEnableVertexAttribArray(3);
-
-    glBindBuffer(GL_ARRAY_BUFFER, sliderGUI->vboIsSelecteds);
-    glBufferData(GL_ARRAY_BUFFER,
-                 sizeof(int) * count,
-                 sliderGUI->isSelecteds,
-                 GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(4, 1, GL_INT, GL_FALSE,
-                          sizeof(int),
-                          (GLvoid*)0);
-    glEnableVertexAttribArray(4);
+      glEnableVertexAttribArray(4);
+    } glBindBuffer(GL_ARRAY_BUFFER, 0);
   }
 }
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-static bool keysPressed[1024];
-static bool keysHeld[1024];
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
+static bool KeysPressed[1024];
+static bool KeysHeld[1024];
+void
+KeyCallback(
+  GLFWwindow* window,
+  int Key,
+  int ScanCode,
+  int Action,
+  int Mode)
 {
-  if(key == GLFW_KEY_ESCAPE)
+  if(Key == GLFW_KEY_ESCAPE)
   {
     glfwSetWindowShouldClose(window, GL_TRUE);
   }
 
-  if(action == GLFW_PRESS)
+  if(Action == GLFW_PRESS)
   {
-    keysPressed[key] = true;
-    keysHeld[key] = true; 
+    KeysPressed[Key] = true;
+    KeysHeld[Key] = true; 
   }
-  else if(action == GLFW_RELEASE)
+  else if(Action == GLFW_RELEASE)
   {
-    keysHeld[key] = false;
+    KeysHeld[Key] = false;
   }
 }
 
-static GLfloat mouseCoords[2];
-void mouseCallback(GLFWwindow* window, double xpos, double ypos)
+static GLfloat MouseCoords[2];
+void
+MouseCallback(GLFWwindow* Window, double XPos, double YPos)
 {
-  mouseCoords[0] = (GLfloat)xpos;
-  mouseCoords[1] = (GLfloat)ypos;
+  MouseCoords[0] = (GLfloat)XPos;
+  MouseCoords[1] = (GLfloat)YPos;
 }
 #pragma warning(pop)
 
@@ -206,8 +221,8 @@ int main()
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	GLFWwindow* Window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut",
-                                        NULL, NULL);
+  GLFWwindow* Window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Duckbut",
+    NULL, NULL);
   if(!Window)
   {
     printf("GLFW window creation failure.\n");
@@ -216,7 +231,6 @@ int main()
   }
 
   glfwMakeContextCurrent(Window);
-
   glewExperimental = GL_TRUE;
   if (glewInit() != GLEW_OK)
   {
@@ -225,8 +239,8 @@ int main()
     return -1;
   }
 
-  glfwSetKeyCallback(Window, keyCallback);
-  glfwSetCursorPosCallback(Window, mouseCallback);
+  glfwSetKeyCallback(Window, KeyCallback);
+  glfwSetCursorPosCallback(Window, MouseCallback);
   glfwSetInputMode(Window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   int Width, Height;
@@ -253,27 +267,32 @@ int main()
   shader GUIShader;
   InitGUIShader(&GUIShader);
   
-  GLuint quadVAO;
-  GLuint quadVBO;
-  GLfloat quadVertices[] = {
+  GLuint QuadVAO;
+  GLuint QuadVBO;
+  GLfloat QuadVertices[] = {
     -1.f, 1.f, 0.f,     0.f, 1.f,
     -1.f, -1.f, 0.f,    0.f, 0.f,
     1.f, 1.f, 0.f,      1.f, 1.f,
     1.f, -1.f, 0.f,      1.f, 0.f
   };
 
-  glGenVertexArrays(1, &quadVAO);
-  glGenBuffers(1, &quadVBO);
-  glBindVertexArray(quadVAO);
-  glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
-  glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+  glGenVertexArrays(1, &QuadVAO);
+  glGenBuffers(1, &QuadVBO);
+  glBindVertexArray(QuadVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, QuadVBO);
+  {
+    glBufferData(GL_ARRAY_BUFFER, sizeof(QuadVertices), &QuadVertices,
+      GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
+      (GLvoid*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
+      (GLvoid*)(3 * sizeof(GLfloat)));
+  } glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 #define P2F(X, DIM) ((X)/(float)(DIM)) * 2.f - 1.f
-  float sliderStaticInfo[] = {
+  float SliderGeometry[] = {
     P2F(0, SCREEN_WIDTH), P2F(SCREEN_HEIGHT, SCREEN_HEIGHT),
     200.f / SCREEN_WIDTH * 2, 5.f / SCREEN_HEIGHT * 2,
     5.f / SCREEN_WIDTH * 2,
@@ -296,146 +315,159 @@ int main()
     20.f / SCREEN_WIDTH * 2
   };
 
-  float sliderTs[5] = {};
-  int sliderIsSelecteds[5] = {};
+  float SliderValues[5] = {};
+  int SliderSelections[5] = {};
 
-  SliderGUI sliderGUI = {};
-  sliderGUI.positions = sliderStaticInfo;
-  sliderGUI.ts = sliderTs;
-  sliderGUI.isSelecteds = sliderIsSelecteds;
-  initSliderGUI(&sliderGUI, 5);
+  slider_gui SliderGUI = {};
+  SliderGUI.Positions = SliderGeometry;
+  SliderGUI.Values = SliderValues;
+  SliderGUI.Selections = SliderSelections;
+  InitSliderGUI(&SliderGUI, 5);
 
-  GLuint perlinNoiseTextureID;
-  glGenTextures(1, &perlinNoiseTextureID);
-  generate2DPerlinNoise(perlinNoiseTextureID, 420);
+  GLuint NoiseTextureID;
+  glGenTextures(1, &NoiseTextureID);
+  Generate2DPerlinNoise(NoiseTextureID, 420);
 
-  Camera camera;
-  initCamera(&camera, (GLfloat)Width, (GLfloat)Height);
+  camera Camera;
+  InitCamera(&Camera, (GLfloat)Width, (GLfloat)Height);
 
-  DirectionalLight directionalLights[1] = {};
-  directionalLights[0].direction = glm::vec3(0.f, 5.f, -2.f);
-  directionalLights[0].color = glm::vec3(0.f, 1.f, 0.f);
-  directionalLights[0].intensity.ambient = 255 * 0.1f;
-  directionalLights[0].intensity.diffuse = 255 * 0.5f;
-  directionalLights[0].intensity.specular = 255 * 0.5f;
+  directional_light DirectionalLights[1] = {};
+  DirectionalLights[0].Direction = glm::vec3(0.f, 5.f, -2.f);
+  DirectionalLights[0].Color = glm::vec3(0.f, 1.f, 0.f);
+  DirectionalLights[0].Intensity.Ambient = 255 * 0.1f;
+  DirectionalLights[0].Intensity.Diffuse = 255 * 0.5f;
+  DirectionalLights[0].Intensity.Specular = 255 * 0.5f;
 
 #define POINT_LIGHT_COUNT 2
-  PointLight pointLights[POINT_LIGHT_COUNT] = {};
-  pointLights[0].position = glm::vec3(0.f, 5.f, -2.f);
-  pointLights[0].color = glm::vec3(1.f, 0.1f, 0.1f);
-  pointLights[1].position = glm::vec3(0.f, 1.f, -8.f);
-  pointLights[1].color = glm::vec3(1.f, 1.f, 1.f);
+  point_light PointLights[POINT_LIGHT_COUNT] = {};
+  PointLights[0].Position = glm::vec3(0.f, 5.f, -2.f);
+  PointLights[0].Color = glm::vec3(1.f, 0.1f, 0.1f);
+  PointLights[1].Position = glm::vec3(0.f, 1.f, -8.f);
+  PointLights[1].Color = glm::vec3(1.f, 1.f, 1.f);
 
 #define OBJECT_TYPE_NONE 0
 #define OBJECT_TYPE_DEFAULT 1
 #define OBJECT_TYPE_POINTLIGHT 2
-  RenderObject LightShape;
-  LightShape.objectType = OBJECT_TYPE_POINTLIGHT;
-  LightShape.mesh = par_shapes_create_parametric_sphere(32, 32);
-  LightShape.model = glm::scale(LightShape.model, glm::vec3(0.5f, 0.5f, 0.5f));
-  initRenderObject(&LightShape);  
+  render_object LightShape;
+  LightShape.Type = OBJECT_TYPE_POINTLIGHT;
+  LightShape.Mesh = par_shapes_create_parametric_sphere(32, 32);
+  LightShape.ModelMatrix =
+    glm::scale(LightShape.ModelMatrix, glm::vec3(0.5f, 0.5f, 0.5f));
+  InitRenderObject(&LightShape);  
 
-  RenderObject shape;
-  shape.objectType = OBJECT_TYPE_DEFAULT;
-  shape.mesh = par_shapes_create_parametric_sphere(32, 32);
-  shape.model = glm::translate(shape.model, glm::vec3(0.f, 0.f, 0.f));
-  shape.color = glm::vec3(0.7f); 
-  initRenderObject(&shape);
+  render_object WhiteSphere;
+  WhiteSphere.Type = OBJECT_TYPE_DEFAULT;
+  WhiteSphere.Mesh = par_shapes_create_parametric_sphere(32, 32);
+  WhiteSphere.ModelMatrix =
+    glm::translate(WhiteSphere.ModelMatrix, glm::vec3(0.f, 0.f, 0.f));
+  WhiteSphere.Color = glm::vec3(0.7f); 
+  InitRenderObject(&WhiteSphere);
 
-  RenderObject shape2;
-  shape2.objectType = OBJECT_TYPE_DEFAULT;
-  shape2.mesh = par_shapes_create_parametric_sphere(32, 32);
-  shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 1.f, -3.f));
-  shape2.color = glm::vec3(.2f, 1.f, 1.f);
-  initRenderObject(&shape2);
+  render_object TealSphere;
+  TealSphere.Type = OBJECT_TYPE_DEFAULT;
+  TealSphere.Mesh = par_shapes_create_parametric_sphere(32, 32);
+  TealSphere.ModelMatrix =
+    glm::translate(TealSphere.ModelMatrix, glm::vec3(0.f, 1.f, -3.f));
+  TealSphere.Color = glm::vec3(.2f, 1.f, 1.f);
+  InitRenderObject(&TealSphere);
 
-  char currentPointLightIndex = 0;
-  char currentSliderIndex = 0;
-  float* currentLightSliders[5] = {};
-  flattenPointLightSliders(&pointLights[currentPointLightIndex],
-                           currentLightSliders);
+  char CurrentPointLightIndex = 0;
+  char CurrentSliderIndex = 0;
+  float* CurrentLightSliders[5] = {};
+  FlattenPointLightSliders(&PointLights[CurrentPointLightIndex],
+                           CurrentLightSliders);
     
-  GLfloat mouseCoordsAtLastFrameStart[2];
-  mouseCoordsAtLastFrameStart[0] = mouseCoords[0];
-  mouseCoordsAtLastFrameStart[1] = mouseCoords[1];
+  GLfloat MouseCoordsAtLastFrameStart[2];
+  MouseCoordsAtLastFrameStart[0] = MouseCoords[0];
+  MouseCoordsAtLastFrameStart[1] = MouseCoords[1];
 
-  GLfloat dT = 0.f;
-  GLfloat timeAtLastFrameStart = 0.f;
+  GLfloat DT = 0.f;
+  GLfloat TimeAtLastFrameStart = 0.f;
   while(!glfwWindowShouldClose(Window))
   {
-    GLfloat timeNow = (GLfloat)glfwGetTime();
-    dT = timeNow - timeAtLastFrameStart;
+    GLfloat TimeNow = (GLfloat)glfwGetTime();
+    DT = TimeNow - TimeAtLastFrameStart;
 
-    timeAtLastFrameStart = timeNow;
+    TimeAtLastFrameStart = TimeNow;
 
-    memset(keysPressed, 0, 1024 * sizeof(bool)); 
+    memset(KeysPressed, 0, 1024 * sizeof(bool)); 
 
     glfwPollEvents();
 
-    GLfloat mouseCoordsNow[2];
-    mouseCoordsNow[0] = mouseCoords[0];
-    mouseCoordsNow[1] = mouseCoords[1];
+    GLfloat MouseCoordsNow[2];
+    MouseCoordsNow[0] = MouseCoords[0];
+    MouseCoordsNow[1] = MouseCoords[1];
 
-    updateCamera(&camera,
-                 mouseCoordsNow[0] - mouseCoordsAtLastFrameStart[0],
-                 mouseCoordsNow[1] - mouseCoordsAtLastFrameStart[1],
-                 keysHeld,
-                 dT);
+    UpdateCamera(&Camera,
+                 MouseCoordsNow[0] - MouseCoordsAtLastFrameStart[0],
+                 MouseCoordsNow[1] - MouseCoordsAtLastFrameStart[1],
+                 KeysHeld,
+                 DT);
 
-    mouseCoordsAtLastFrameStart[0] = mouseCoordsNow[0];
-    mouseCoordsAtLastFrameStart[1] = mouseCoordsNow[1];
+    MouseCoordsAtLastFrameStart[0] = MouseCoordsNow[0];
+    MouseCoordsAtLastFrameStart[1] = MouseCoordsNow[1];
 
 #define SLIDERSPEED (25 / 255.f)
-    if(keysPressed[GLFW_KEY_TAB])
+    if(KeysPressed[GLFW_KEY_TAB])
     {
-      if(keysPressed[GLFW_MOD_SHIFT])
-        --currentPointLightIndex;     
+      if(KeysPressed[GLFW_MOD_SHIFT])
+        --CurrentPointLightIndex;     
       else
-        ++currentPointLightIndex;
+        ++CurrentPointLightIndex;
       
-      currentPointLightIndex = (currentPointLightIndex + POINT_LIGHT_COUNT)
+      CurrentPointLightIndex = (CurrentPointLightIndex + POINT_LIGHT_COUNT)
                                   % POINT_LIGHT_COUNT;
-      flattenPointLightSliders(&pointLights[currentPointLightIndex],
-                               currentLightSliders);
+      FlattenPointLightSliders(&PointLights[CurrentPointLightIndex],
+                               CurrentLightSliders);
     }
 
-    if(keysPressed[GLFW_KEY_GRAVE_ACCENT])
+    if(KeysPressed[GLFW_KEY_GRAVE_ACCENT])
       DebugMode = !DebugMode;
 
     if(DebugMode)
     {
-      if(keysPressed[GLFW_KEY_1])
-        currentSliderIndex = 0;
-      else if(keysPressed[GLFW_KEY_2])
-        currentSliderIndex = 1;
-      else if(keysPressed[GLFW_KEY_3])
-        currentSliderIndex = 2;
-      else if(keysPressed[GLFW_KEY_4])
-        currentSliderIndex = 3;
-      else if(keysPressed[GLFW_KEY_5])
-        currentSliderIndex = 4;
+      if(KeysPressed[GLFW_KEY_1])
+        CurrentSliderIndex = 0;
+      else if(KeysPressed[GLFW_KEY_2])
+        CurrentSliderIndex = 1;
+      else if(KeysPressed[GLFW_KEY_3])
+        CurrentSliderIndex = 2;
+      else if(KeysPressed[GLFW_KEY_4])
+        CurrentSliderIndex = 3;
+      else if(KeysPressed[GLFW_KEY_5])
+        CurrentSliderIndex = 4;
 
-      float* currentLightSlider = currentLightSliders[currentSliderIndex];
-      if(keysHeld[GLFW_KEY_Q])
-        *currentLightSlider -= SLIDERSPEED * dT;
-      if(keysHeld[GLFW_KEY_E])
-        *currentLightSlider += SLIDERSPEED * dT;
+      float* CurrentLightSlider = CurrentLightSliders[CurrentSliderIndex];
+      if(KeysHeld[GLFW_KEY_Q])
+        *CurrentLightSlider -= SLIDERSPEED * DT;
+      if(KeysHeld[GLFW_KEY_E])
+        *CurrentLightSlider += SLIDERSPEED * DT;
 
-      if(*currentLightSlider < 0)
-        *currentLightSlider = 0;
-      if(*currentLightSlider > 1.f)
-        *currentLightSlider = 1;
+      if(*CurrentLightSlider < 0)
+        *CurrentLightSlider = 0;
+      if(*CurrentLightSlider > 1.f)
+        *CurrentLightSlider = 1;
     }
 
 #define ROTATION_SPEED .2f
-    shape.model = glm::rotate(shape.model, ROTATION_SPEED * dT, glm::vec3(0.5f,
-       .5f, 0.5f));
-    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT,
-     glm::vec3(0.3f, 0.f, 0.6f));
-    shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, 5.f));
-    shape2.model = glm::rotate(shape2.model, ROTATION_SPEED * dT, glm::vec3(1.f,
-       0.f, 0.f));
-    shape2.model = glm::translate(shape2.model, glm::vec3(0.f, 0.f, -5.f));
+    WhiteSphere.ModelMatrix =
+      glm::rotate(WhiteSphere.ModelMatrix,
+                  ROTATION_SPEED * DT,
+                  glm::vec3(0.5f, .5f, 0.5f));
+    TealSphere.ModelMatrix =
+      glm::rotate(TealSphere.ModelMatrix,
+                  ROTATION_SPEED * DT,
+                  glm::vec3(0.3f, 0.f, 0.6f));
+    TealSphere.ModelMatrix =
+      glm::translate(TealSphere.ModelMatrix,
+                     glm::vec3(0.f, 0.f, 5.f));
+    TealSphere.ModelMatrix =
+      glm::rotate(TealSphere.ModelMatrix,
+                  ROTATION_SPEED * DT,
+                  glm::vec3(1.f, 0.f, 0.f));
+    TealSphere.ModelMatrix =
+      glm::translate(TealSphere.ModelMatrix,
+                     glm::vec3(0.f, 0.f, -5.f));
 
     glBindFramebuffer(GL_FRAMEBUFFER, GPassShaderInfo.FrameBufferID);
     {
@@ -444,54 +476,64 @@ int main()
     
       glUseProgram(GPassShader.ID);
       {
-        glUniformMatrix4fv(glGetUniformLocation(GPassShader.ID, "projection"),
-          1, GL_FALSE, glm::value_ptr(camera.projection));
-        glUniformMatrix4fv(glGetUniformLocation(GPassShader.ID,"view"), 1,
-          GL_FALSE, glm::value_ptr(camera.view));
+        glUniformMatrix4fv(
+          glGetUniformLocation(GPassShader.ID, "ProjectionMatrix"),
+          1, GL_FALSE,
+          glm::value_ptr(Camera.Projection));
+        glUniformMatrix4fv(
+          glGetUniformLocation(GPassShader.ID,"ViewMatrix"),
+          1, GL_FALSE,
+          glm::value_ptr(Camera.View));
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, perlinNoiseTextureID);
-          drawRenderObject(&shape2, GPassShader.ID);
-          drawRenderObject(&shape, GPassShader.ID);
+        glBindTexture(GL_TEXTURE_2D, NoiseTextureID);
+        {
+          DrawRenderObject(&TealSphere, GPassShader.ID);
+          DrawRenderObject(&WhiteSphere, GPassShader.ID);
+        } // TextureBindEnd
 
         if(DebugMode)
         {
-          for(int pointLightIndex = 0;
-              pointLightIndex < POINT_LIGHT_COUNT;
-              ++pointLightIndex)
+          for(int PointLightIndex = 0;
+              PointLightIndex < POINT_LIGHT_COUNT;
+              ++PointLightIndex)
           {
-            drawPointLightDebugModel(LightShape,
-             &pointLights[pointLightIndex], GPassShader.ID);
+            DrawPointLightModel(
+              LightShape,
+              &PointLights[PointLightIndex],
+              GPassShader.ID);
           }
         }
       } glUseProgram(0);
     }glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glClearColor(.4f, .6f, .2f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if(DebugMode)
     {
       glUseProgram(BloomShader.ID);
       { 
         //Note: This bloom method is taken from learnopengl.com 
-        GLboolean Vertical = false;
 #define BLUR_ITERATIONS 10
-        for(int Iteration = 0; Iteration < BLUR_ITERATIONS; ++Iteration)
+        GLboolean Vertical = false;
+        for(int Iteration = 0;
+            Iteration < BLUR_ITERATIONS;
+            ++Iteration)
         {
-          glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+          glUniformSubroutinesuiv(
+            GL_FRAGMENT_SHADER, 1,
             &BloomShaderInfo.SubroutineIndices[Vertical]);
 
-          glBindFramebuffer(GL_FRAMEBUFFER,
+          glBindFramebuffer(
+            GL_FRAMEBUFFER,
             BloomShaderInfo.FrameBufferIDs[Vertical]);
           {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,
+            glBindTexture(
+              GL_TEXTURE_2D,
               Iteration == 0 ?
-              GPassShaderInfo.PointLightColorBufferID :
-              BloomShaderInfo.ColorBufferIDs[!Vertical]);
+                GPassShaderInfo.PointLightColorTextureID :
+                BloomShaderInfo.ColorTextureIDs[!Vertical]);
             
-            glBindVertexArray(quadVAO);
+            glBindVertexArray(QuadVAO);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
              
           } glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -500,171 +542,185 @@ int main()
       } glUseProgram(0);
     }
 
-    glUseProgram(LPassShader.ID);
-    {
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.PositionBufferID);
-      glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.NormalBufferID);
-      glActiveTexture(GL_TEXTURE2);
-      glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.ColorBufferID);
+   glClearColor(.4f, .6f, .2f, 1.0f);
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      if(DebugMode)
-      {
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D,
-          BloomShaderInfo.ColorBufferIDs[(BLUR_ITERATIONS + 1) % 2]);
+   glUseProgram(LPassShader.ID);
+   {
+     if(DebugMode)
+     {
+       glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+                               &LPassShaderInfo.DebugOnIndex);
+     }
+     else
+     {
+       glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
+                               &LPassShaderInfo.DebugOffIndex);
+     }
 
-        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
-          &LPassShaderInfo.DebugOnIndex);
-      }
-      else
-      {
-        glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 1,
-          &LPassShaderInfo.DebugOffIndex);
-      }
+     glUniform3fv(
+       glGetUniformLocation(LPassShader.ID, "ViewPosition"),
+       1, glm::value_ptr(Camera.Position));
 
-      glUniform3fv(glGetUniformLocation(LPassShader.ID, "viewPosition"), 1,
-        glm::value_ptr(camera.position));
+     glUniform3fv(
+       glGetUniformLocation(LPassShader.ID, "DirectionalLights[0].Direction"),
+       1, glm::value_ptr(DirectionalLights[0].Direction));
+     glUniform3fv(
+       glGetUniformLocation(LPassShader.ID, "DirectionalLights[0].Color"),
+       1, glm::value_ptr(DirectionalLights[0].Color)); 
 
-      glUniform3fv(glGetUniformLocation(LPassShader.ID,
-        "directionalLights[0].direction"), 1,
-        glm::value_ptr(directionalLights[0].direction));
-      glUniform3fv(glGetUniformLocation(LPassShader.ID,
-        "directionalLights[0].color"), 1,
-        glm::value_ptr(directionalLights[0].color));
+     glUniform1f(
+       glGetUniformLocation(LPassShader.ID,
+                            "DirectionalLights[0].IntensityAmbient"),
+       DirectionalLights[0].Intensity.Ambient / 255.f);
+     glUniform1f(
+       glGetUniformLocation(LPassShader.ID,
+                            "DirectionalLights[0].IntensityDiffuse"),
+       DirectionalLights[0].Intensity.Diffuse / 255.f);
+     glUniform1f(
+      glGetUniformLocation(LPassShader.ID,
+                           "DirectionalLights[0].IntensitySpecular"),
+      DirectionalLights[0].Intensity.Specular / 255.f);
 
-      glUniform1f(glGetUniformLocation(LPassShader.ID,
-        "directionalLights[0].intensityAmbient"),
-        directionalLights[0].intensity.ambient / 255.f);
-      glUniform1f(glGetUniformLocation(LPassShader.ID,
-        "directionalLights[0].intensityDiffuse"),
-        directionalLights[0].intensity.diffuse / 255.f);
-      glUniform1f(glGetUniformLocation(LPassShader.ID,
-        "directionalLights[0].intensitySpecular"),
-        directionalLights[0].intensity.specular / 255.f);
-    
-      glBindBuffer(GL_UNIFORM_BUFFER, LPassShaderInfo.UniformBufferID);
-      float buffer[32];
-      int offset = 0;
-      for(int pointLightIndex = 0;
-          pointLightIndex < POINT_LIGHT_COUNT;
-          ++pointLightIndex)
-      {
-        int size = sizeof(float) * 4; //vec3 color (vec4 min)
-       memcpy(buffer + offset,
-           glm::value_ptr(pointLights[pointLightIndex].color),
-           size);
-        offset += 4;
+     glBindBuffer(GL_UNIFORM_BUFFER, LPassShaderInfo.UniformBufferID);
+     {
+       float Buffer[32];
+       int Offset = 0;
+       for(int PointLightIndex = 0;
+           PointLightIndex < POINT_LIGHT_COUNT;
+           ++PointLightIndex)
+       {
+         int Size = sizeof(float) * 4; //vec3 Color (vec4 min)
+         memcpy(Buffer + Offset,
+                glm::value_ptr(PointLights[PointLightIndex].Color), Size);
+         Offset += 4;
 
-        //vec3 position (vec4 min)
-        memcpy(buffer + offset,
-          glm::value_ptr(pointLights[pointLightIndex].position),
-          size);
-        offset += 4;
+         //vec3 Position (vec4 min)
+         memcpy(Buffer + Offset,
+                glm::value_ptr(PointLights[PointLightIndex].Position), Size);
+         Offset += 4;
 
-        size = sizeof(float) * 2; //float attenuations[2]
-        memcpy(buffer + offset,
-          pointLights[pointLightIndex].attenuations,
-          size);
-        offset += 2;
+         Size = sizeof(float) * 2; //float Attenuations[2]
+         memcpy(Buffer + Offset,
+                PointLights[PointLightIndex].Attenuations, Size);
+         Offset += 2;
 
-        size = sizeof(float) * 3; //float intensities[3]
-        memcpy(buffer + offset,
-          pointLights[pointLightIndex].intensities,
-          size);
-        offset += 3;
-        offset += 3;
-      }
-      glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(buffer), buffer);
-      glBindBuffer(GL_UNIFORM_BUFFER, 0);
+         Size = sizeof(float) * 3; //float Intensities[3]
+         memcpy(Buffer + Offset,
+                PointLights[PointLightIndex].Intensities, Size);
+         Offset += 3;
 
-      glBindVertexArray(quadVAO);
-      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    } glUseProgram(0);
+         // Note: Additional offset for stride alignment
+         Offset += 3;
+       }
+       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Buffer), Buffer);
+     }
+     glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+     glActiveTexture(GL_TEXTURE0);
+     glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.PositionTextureID);
+     glActiveTexture(GL_TEXTURE1);
+     glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.NormalTextureID);
+     glActiveTexture(GL_TEXTURE2);
+     glBindTexture(GL_TEXTURE_2D, GPassShaderInfo.ColorTextureID);
+     glActiveTexture(GL_TEXTURE3);
+     glBindTexture(
+       GL_TEXTURE_2D,
+       BloomShaderInfo.ColorTextureIDs[(BLUR_ITERATIONS + 1) % 2]);
+     {
+       glBindVertexArray(QuadVAO);
+       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+     } // TextureBindEnd
+   } glUseProgram(0);
 
    if(DebugMode)
    {
      glEnable(GL_STENCIL_TEST);
 
-     glBindFramebuffer(GL_FRAMEBUFFER, OutlineShaderInfo.FrameBufferID);
+     glUseProgram(OutlineShader.ID);
      {
-       glStencilFunc(GL_ALWAYS, 1, 0xFF);
-       glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-       glStencilMask(0xFF);
-       glDepthMask(GL_FALSE);
-       glClearColor(1.f, 1.f, 1.f, 1.f);
-       glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-       
-       glUseProgram(OutlineShader.ID);
+       glUniformMatrix4fv(
+         glGetUniformLocation(OutlineShader.ID, "ProjectionMatrix"),
+         1, GL_FALSE, glm::value_ptr(Camera.Projection));
+       glUniformMatrix4fv(
+         glGetUniformLocation(OutlineShader.ID, "ViewMatrix"),
+         1, GL_FALSE, glm::value_ptr(Camera.View));
+
+       glBindFramebuffer(GL_FRAMEBUFFER, OutlineShaderInfo.FrameBufferID);
        {
-         glUniformMatrix4fv(
-           glGetUniformLocation(OutlineShader.ID, "projection"),
-           1, GL_FALSE, glm::value_ptr(camera.projection));
-         glUniformMatrix4fv(
-           glGetUniformLocation(OutlineShader.ID, "view"),
-           1, GL_FALSE, glm::value_ptr(camera.view));
+         glStencilFunc(GL_ALWAYS, 1, 0xFF);
+         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+         glStencilMask(0xFF);
+         glDepthMask(GL_FALSE);
+         glClearColor(1.f, 1.f, 1.f, 1.f);
+         glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+       
+         DrawPointLightModel(
+           LightShape,
+           &PointLights[CurrentPointLightIndex], 0.8f, OutlineShader.ID);
+       }
+       glBindFramebuffer(GL_READ_FRAMEBUFFER, OutlineShaderInfo.FrameBufferID);
+       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+       { 
+         glBlitFramebuffer(
+           0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+           0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+           GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+       } glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-         drawPointLightDebugModel(LightShape,
-          &pointLights[currentPointLightIndex], 0.8f, OutlineShader.ID);
+       glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+       glStencilMask(0x00);
+       glDepthMask(GL_TRUE);
+       glClear(GL_DEPTH_BUFFER_BIT);
 
-         glBindFramebuffer(GL_READ_FRAMEBUFFER,
-           OutlineShaderInfo.FrameBufferID);
-         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-         {
-           glBlitFramebuffer(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                             0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                             GL_STENCIL_BUFFER_BIT, GL_NEAREST);
-           glBindFramebuffer(GL_FRAMEBUFFER, 0);
+       DrawPointLightModel(LightShape,
+         &PointLights[CurrentPointLightIndex],
+         OutlineShader.ID);
 
-           glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-           glStencilMask(0x00);
-           glDepthMask(GL_TRUE);
-           glClear(GL_DEPTH_BUFFER_BIT);
-
-           drawPointLightDebugModel(LightShape,
-             &pointLights[currentPointLightIndex],
-             OutlineShader.ID);
-
-           glDisable(GL_STENCIL_TEST);
-         } //glBindFramebuffer
-       } glUseProgram(0);
-     } glBindFramebuffer(GL_FRAMEBUFFER, 0);
+       glDisable(GL_STENCIL_TEST);
+     } glUseProgram(0);
 
      glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
      glUseProgram(GUIShader.ID); 
      {
-       glUniform1f(glGetUniformLocation(GUIShader.ID, "onePixel"),
+       glUniform1f(
+         glGetUniformLocation(GUIShader.ID, "OnePixel"),
          1.f / SCREEN_WIDTH * 2);
 
-       sliderTs[0] = *currentLightSliders[0];
-       sliderTs[1] = *currentLightSliders[1];
-       sliderTs[2] = *currentLightSliders[2];
-       sliderTs[3] = *currentLightSliders[3];
-       sliderTs[4] = *currentLightSliders[4];
+       SliderValues[0] = *CurrentLightSliders[0];
+       SliderValues[1] = *CurrentLightSliders[1];
+       SliderValues[2] = *CurrentLightSliders[2];
+       SliderValues[3] = *CurrentLightSliders[3];
+       SliderValues[4] = *CurrentLightSliders[4];
      
-       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboTs);
-       glBufferData(GL_ARRAY_BUFFER,
-                    sizeof(float) * 5,
-                    sliderGUI.ts,
-                    GL_DYNAMIC_DRAW);
+       glBindBuffer(GL_ARRAY_BUFFER, SliderGUI.ValueVBO);
+       {
+         glBufferData(
+           GL_ARRAY_BUFFER,
+           sizeof(float) * 5,
+           SliderGUI.Values,
+           GL_DYNAMIC_DRAW);
+       }
 
        for(int SliderIndex = 0;
-         SliderIndex < 5;
-         ++SliderIndex)
+           SliderIndex < 5;
+           ++SliderIndex)
        {
-           sliderIsSelecteds[SliderIndex] = 0;  
+         SliderSelections[SliderIndex] = 0;  
        }
-       sliderIsSelecteds[currentSliderIndex] = 1;
+       SliderSelections[CurrentSliderIndex] = 1;
 
-       glBindBuffer(GL_ARRAY_BUFFER, sliderGUI.vboIsSelecteds);
-       glBufferData(GL_ARRAY_BUFFER,
-                  sizeof(int) * 5,
-                  sliderGUI.isSelecteds,
-                  GL_DYNAMIC_DRAW);
+       glBindBuffer(GL_ARRAY_BUFFER, SliderGUI.SelectionVBO);
+       {
+         glBufferData(
+           GL_ARRAY_BUFFER,
+           sizeof(int) * 5,
+           SliderGUI.Selections,
+           GL_DYNAMIC_DRAW);
+       }
 
-       glBindVertexArray(sliderGUI.VAO);
+       glBindVertexArray(SliderGUI.VAO);
        glDrawArrays(GL_POINTS, 0, 5);
        glBindVertexArray(0);
      }
@@ -686,11 +742,11 @@ int main()
     Sleep(1);
   }
 
-  par_shapes_free_mesh(shape.mesh);
-  destroyRenderObject(&shape);
+  par_shapes_free_mesh(WhiteSphere.Mesh);
+  destroyRenderObject(&WhiteSphere);
 
-  par_shapes_free_mesh(shape2.mesh);
-  destroyRenderObject(&shape2);
+  par_shapes_free_mesh(TealSphere.Mesh);
+  destroyRenderObject(&TealSphere);
 
   glfwTerminate();
 

@@ -1,25 +1,26 @@
 R""(
 #version 400 core
-out VS_OUT
+out vs_out
 {
- float t;
- float barWidth;
- vec2 dimensions;
- int isSelected;
-}vs_out;
+ float Value;
+ float ThumbWidth;
+ vec2 Dimensions;
+ int IsSelected;
+} VSOut;
 
-layout (location = 0) in vec2 position;
-layout (location = 1) in vec2 dimensions;
-layout (location = 2) in float barWidth;
-layout (location = 3) in float t;
-layout (location = 4) in int isSelected;
+layout (location = 0) in vec2 Position;
+layout (location = 1) in vec2 Dimensions;
+layout (location = 2) in float ThumbWidth;
+layout (location = 3) in float Value;
+layout (location = 4) in int IsSelected;
 
-void main()
+void
+main()
 {
-  gl_Position = vec4(position.x, position.y, 0.0f, 1.0f);
-  vs_out.t = t;
-  vs_out.dimensions = dimensions;
-  vs_out.barWidth = barWidth;
-  vs_out.isSelected = isSelected; 
+  gl_Position = vec4(Position.x, Position.y, 0.0f, 1.0f);
+  VSOut.Value = Value;
+  VSOut.Dimensions = Dimensions;
+  VSOut.ThumbWidth = ThumbWidth;
+  VSOut.IsSelected = IsSelected; 
 };
 )"";

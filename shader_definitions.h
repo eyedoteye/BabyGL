@@ -30,13 +30,13 @@ struct gpass_info
     GLuint DefaultBuffers[3];
     struct
     {
-      GLuint PositionBufferID;
-      GLuint NormalBufferID;
-      GLuint ColorBufferID;
+      GLuint PositionTextureID;
+      GLuint NormalTextureID;
+      GLuint ColorTextureID;
     };
   };
   //Todo: Move into seperate deferred set-up.
-  GLuint PointLightColorBufferID;
+  GLuint PointLightColorTextureID;
 };
 
 void
@@ -60,11 +60,11 @@ CreateDeferredBuffer(
       } glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    glGenTextures(1, &DeferredBuffer->PointLightColorBufferID);
-    glBindTexture(GL_TEXTURE_2D, DeferredBuffer->PointLightColorBufferID);
+    glGenTextures(1, &DeferredBuffer->PointLightColorTextureID);
+    glBindTexture(GL_TEXTURE_2D, DeferredBuffer->PointLightColorTextureID);
     {
       SetupBasicTexture(GL_RGBA16F, GL_RGBA, GL_COLOR_ATTACHMENT3,
-        DeferredBuffer->PointLightColorBufferID, Width, Height);
+        DeferredBuffer->PointLightColorTextureID, Width, Height);
     } glBindTexture(GL_TEXTURE_2D, 0);
 
     GLuint Attachments[4] = {
@@ -94,17 +94,17 @@ InitGPassShader(
 {
   Shader->Name = "GPass";
   Shader->VertexSource =
-    #include "gPass.vs"
+    #include "g_pass.vs"
   Shader->GeometrySource = NULL;
   Shader->FragmentSource =
-    #include "gPass.fs"
+    #include "g_pass.fs"
 
   compileShader(Shader);
   linkShader(Shader);
 
   glUseProgram(Shader->ID);
   {
-    glUniform1i(glGetUniformLocation(Shader->ID, "perlinNoise"), 0);
+    glUniform1i(glGetUniformLocation(Shader->ID, "PerlinNoise"), 0);
   } glUseProgram(0);
 
   CreateDeferredBuffer(Info, Width, Height);
@@ -127,30 +127,30 @@ InitLPassShader(
 {
   Shader->Name = "LPass";
   Shader->VertexSource =
-    #include "lPass.vs"
+    #include "l_pass.vs"
   Shader->GeometrySource = NULL;
   Shader->FragmentSource =
-    #include "lPass.fs"
+    #include "l_pass.fs"
 
   compileShader(Shader);
   linkShader(Shader);
 
   glUseProgram(Shader->ID);
   {
-    glUniform1i(glGetUniformLocation(Shader->ID, "positionBuffer"), 0);
-    glUniform1i(glGetUniformLocation(Shader->ID, "normalBuffer"), 1);
-    glUniform1i(glGetUniformLocation(Shader->ID, "colorBuffer"), 2);
+    glUniform1i(glGetUniformLocation(Shader->ID, "PositionTexture"), 0);
+    glUniform1i(glGetUniformLocation(Shader->ID, "NormalTexture"), 1);
+    glUniform1i(glGetUniformLocation(Shader->ID, "ColorTexture"), 2);
     // Todo: Split PointLight handling into its own shader.
-    glUniform1i(glGetUniformLocation(Shader->ID, "lightColorBuffer"), 3);
+    glUniform1i(glGetUniformLocation(Shader->ID, "PointLightColorTexture"), 3);
     
     Info->DebugOnIndex = glGetSubroutineIndex(Shader->ID,
-      GL_FRAGMENT_SHADER, "debugOn"); 
+      GL_FRAGMENT_SHADER, "DebugOn"); 
     Info->DebugOffIndex = glGetSubroutineIndex(Shader->ID,
-      GL_FRAGMENT_SHADER, "debugOff");
+      GL_FRAGMENT_SHADER, "DebugOff");
   } glUseProgram(0);  
 
   glUniformBlockBinding(Shader->ID,
-    glGetUniformBlockIndex(Shader->ID, "pointLightsUBO"), 0);
+    glGetUniformBlockIndex(Shader->ID, "PointLightUBO"), 0);
   
   glGenBuffers(1, &Info->UniformBufferID);
 
@@ -185,7 +185,7 @@ struct bloom_info
   };
   union
   {
-    GLuint ColorBufferIDs[2];
+    GLuint ColorTextureIDs[2];
     struct
     {
       GLuint ColorBufferHorizontalID;
@@ -212,16 +212,16 @@ InitBloomShader(
 {
   Shader->Name = "Bloom";
   Shader->VertexSource =
-    #include "debugObjects.vs"
+    #include "bloom.vs"
   Shader->GeometrySource = NULL;
   Shader->FragmentSource =
-    #include "debugObjects.fs"
+    #include "bloom.fs"
 
   compileShader(Shader);
   linkShader(Shader);
 
   glGenFramebuffers(2, Info->FrameBufferIDs);
-  glGenTextures(2, Info->ColorBufferIDs);
+  glGenTextures(2, Info->ColorTextureIDs);
   
   glUseProgram(Shader->ID);
   {
@@ -231,32 +231,32 @@ InitBloomShader(
     {
       glBindFramebuffer(GL_FRAMEBUFFER, Info->FrameBufferIDs[AxisIndex]);
       {
-        glBindTexture(GL_TEXTURE_2D, Info->ColorBufferIDs[AxisIndex]);
+        glBindTexture(GL_TEXTURE_2D, Info->ColorTextureIDs[AxisIndex]);
         {
           SetupBasicTexture(GL_RGBA16F, GL_RGBA, GL_COLOR_ATTACHMENT0,
-            Info->ColorBufferIDs[AxisIndex], Width, Height);
+            Info->ColorTextureIDs[AxisIndex], Width, Height);
 
           if(glCheckFramebufferStatus(GL_FRAMEBUFFER) !=
             GL_FRAMEBUFFER_COMPLETE)
           {
-            printf("Framebuffer is broken: Bloom:%i", AxisIndex);
+            printf("Framebuffer is broken: Bloom:%i\n", AxisIndex);
           }
         } glBindTexture(GL_TEXTURE_2D, 0);
       } glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     Info->SubroutineHorizontalIndex = glGetSubroutineIndex(
-      Shader->ID, GL_FRAGMENT_SHADER, "blurHorizontal");
+      Shader->ID, GL_FRAGMENT_SHADER, "BlurHorizontal");
     Info->SubroutineVerticalIndex = glGetSubroutineIndex(
-      Shader->ID, GL_FRAGMENT_SHADER, "blurVertical");
+      Shader->ID, GL_FRAGMENT_SHADER, "BlurVertical");
   } glUseProgram(0);  
 }
 
 struct outline_info
 {
   GLuint FrameBufferID;
-  GLuint ColorBufferID;
-  GLuint StencilBufferID;
+  GLuint ColorTextureID;
+  GLuint StencilTextureID;
 };
 
 void
@@ -266,12 +266,12 @@ InitOutlineShader(
   GLuint Width,
   GLuint Height)
 {
-  Shader->Name = "Bloom";
+  Shader->Name = "Outline";
   Shader->VertexSource =
-    #include "pointLightOutline.vs"
+    #include "outline.vs"
   Shader->GeometrySource = NULL;
   Shader->FragmentSource =
-    #include "pointLightOutline.fs"
+    #include "outline.fs"
 
   compileShader(Shader);
   linkShader(Shader);
@@ -279,20 +279,20 @@ InitOutlineShader(
   glGenFramebuffers(1, &Info->FrameBufferID);
   glBindFramebuffer(GL_FRAMEBUFFER, Info->FrameBufferID);
   {
-    glGenTextures(1, &Info->ColorBufferID);
-    glBindTexture(GL_TEXTURE_2D, Info->ColorBufferID);
+    glGenTextures(1, &Info->ColorTextureID);
+    glBindTexture(GL_TEXTURE_2D, Info->ColorTextureID);
     {
       SetupBasicTexture(GL_RGB16F, GL_RGB, GL_COLOR_ATTACHMENT0,
-        Info->ColorBufferID, Width, Height);
+        Info->ColorTextureID, Width, Height);
     } glBindTexture(GL_TEXTURE_2D, 0);
 
-    glGenRenderbuffers(1, &Info->StencilBufferID);
-    glBindRenderbuffer(GL_RENDERBUFFER, Info->StencilBufferID);
+    glGenRenderbuffers(1, &Info->StencilTextureID);
+    glBindRenderbuffer(GL_RENDERBUFFER, Info->StencilTextureID);
     {
       glRenderbufferStorage(GL_RENDERBUFFER, GL_STENCIL_INDEX8, Width,
         Height);
       glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-        GL_RENDERBUFFER, Info->StencilBufferID);
+        GL_RENDERBUFFER, Info->StencilTextureID);
     } glBindRenderbuffer(GL_RENDERBUFFER, 0);
   } glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
