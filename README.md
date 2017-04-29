@@ -3,8 +3,8 @@ BabyGL
 Perhaps not boasting the most descriptive of names, **BabyGL** is a learning
 experiment that renders geometries illuminated via adjustable point-lights.
 
-![gif]()
-![gif]()
+![gif](http://i.imgur.com/SszIbqL.gif)
+![gif](http://i.imgur.com/DkBhajr.gif)
 
 Note that although the running demo only features spherical geometry, the other
 parametric surfaces within [par_shapes](http://github.prideout.net/shapes) are
@@ -37,7 +37,7 @@ Debug Mode
 | Controls | Description |
 | :---: | --- |
 | 1-5 | Select slider |
-| Q, E | Shift Slider Value |
+| Q, E | Shift slider value |
 | Tab, Shift + Tab | Cycle point-light selection |
 
 Sliders are numbered from top to bottom. 
@@ -59,7 +59,7 @@ list is best discovered via a peek over the project source. For the sake of
 brevity, a list of each shader with a notable highlight are included below.
 
 | Shader | Notable Highlight |
-| --- | --- |
+| :---: | --- |
 | GPass | Writing geometry information to texture. |
 | LPass | Passing information via uniform buffer object. |
 | Bloom | Altering shader via subroutines. |
