@@ -1,14 +1,18 @@
 BabyGL
 ======
-Perhaps not boasting the most descriptive of names, **BabyGL** is a learning
-experiment that renders geometries illuminated via adjustable point-lights.
+Perhaps not boasting the most descriptive of names, **BabyGL** is an OpenGL
+learning experiment that renders geometries illuminated via adjustable
+point-lights.
 
 ![gif](http://i.imgur.com/SszIbqL.gif)
 ![gif](http://i.imgur.com/DkBhajr.gif)
 
 Note that although the running demo only features spherical geometry, the other
 parametric surfaces within [par_shapes](http://github.prideout.net/shapes) are
-also supported. 
+also supported.  
+  
+It is worth mentioning that there is a single green directional light pointing
+upwards in this scene. Future work may expand on this, or simply have it removed.
 
 Installation
 ------------
